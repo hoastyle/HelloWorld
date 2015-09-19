@@ -21,7 +21,7 @@ struct Person *Person_create(char *name, int age, int weight, int height)
 	return who;
 }
 
-struct Person *Person_print(struct Person *who)
+void Person_print(struct Person *who)
 {
 	printf("Name: %s\n", who->name);
     printf("\tAge: %d\n", who->age);

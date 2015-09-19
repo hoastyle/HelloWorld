@@ -19,8 +19,7 @@ int main(int argc, char *argv[])
 
 	int num_states = sizeof(states);
 	printf("number of states is %d\n", num_states);
-	printf("%d %d %d %d\n", sizeof(states[0]), sizeof(states[1]), sizeof(states[2]), sizeof(states[3]));
-	printf("%d %d %d %d\n", strlen(states[0]), strlen(states[1]), strlen(states[2]), strlen(states[3]));
+	printf("%lu %lu %lu %lu\n", sizeof(states[0]), sizeof(states[1]), sizeof(states[2]), sizeof(states[3]));
     num_states = 5;
 
     for(i = 0; i < num_states; i++) {
