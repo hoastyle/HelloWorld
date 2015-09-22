@@ -1,0 +1,11 @@
+0001-avr32-bad-inline.patch
+0002-no-mmu.patch
+0003-dlmisc.patch
+0004-conditional-enabling-of-libdl-in-m4.patch
+alsa-lib-01-adi-audio-codec-config.patch
+alsa-lib-02-pcm-ucm.patch
+alsa-lib-03-fix-compile-warning.patch
+alsa-lib-04-change-cards-config-file-name.patch
+alsa-lib-05-add-adi-audio-codec-configs-to-cfg_files.patch
+alsa-lib-06-add-sc58x-codec.patch
+buildroot-libtool-v2.4.4.patch
