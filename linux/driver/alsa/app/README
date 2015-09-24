@@ -1,0 +1,4 @@
+1 Install libasound2-dev for alsa/asoundlib.h.
+# sudo apt-get install libasound2-dev
+
+
