@@ -1,0 +1,28 @@
+Compiling
+---------
+
+  cc -o alsa_netcapture alsa_netcapture.c -lasound
+
+  cc -o alsa_netplay alsa_netplay.c -lasound
+
+Usage
+-----
+  
+  Start the server with
+
+  alsa_netcapture <soundcard> <device> <fragmentsize> <fragments>
+
+  The server will capture from Line In or Mic In. It will permanently wait
+  for connections on port 7700 while capturing. alsa_netplay-clients can 
+  connect to the server and will receive the captured audio stream.
+
+  Start clients with
+ 
+  alsa_netplay <server address> <soundcard> <device> <fragmentsize> <fragments>
+
+  The server_address can be either an IP aderess or a hostname.
+  Soundcard and device parameters usually are both 0.
+  Fragmentsize and number of fragments should be identical on 
+  server and clients. A good value for the fragmentsize is 16384.
+  A good choice for the number of fragments is 2. 
+  

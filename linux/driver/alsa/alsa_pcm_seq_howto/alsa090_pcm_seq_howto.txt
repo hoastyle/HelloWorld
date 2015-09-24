@@ -1,0 +1,586 @@
+/* alsa090_pcm_seq_howto.txt 0.0.5 by Matthias Nagorni */
+
+CONTENTS:   
+--------
+
+1. Introduction
+2. Basic PCM audio
+3. PCM capture 
+4. Writing a sequencer client
+5. A MIDI router
+6. Combining PCM and MIDI: miniFMsynth
+7. Scheduling MIDI events: miniArp
+8. Notes on writing a GUI based audio application
+
+
+Acknowledgement
+---------------
+
+The author is grateful to Takashi Iwai for his assistance in writing
+this howto. Thanks to Frank Neumann for carefully reading this document.
+
+
+1. Introduction
+---------------
+
+This howto intends to give a brief introduction in writing simple audio
+applications with ALSA 0.9.0. Section 2. explains the most basic functions
+for PCM audio. If you remove the explaining text, you end up with a minimal
+PCM playback program. Section 3. briefly treats some functions for PCM
+capture. In section 4. you will learn how to write a simple client for the
+ALSA sequencer. The section is based on the example seqdemo.c, a program
+which can receive MIDI events and displays the most important event types.
+Section 5. demonstrates how the ALSA MIDI sequencer can be used to route
+MIDI events from one input port to several output ports. This section is
+based on the example midiroute.c. Section 6. combines PCM playback and MIDI
+input and explains the mini synthesizer miniFMsynth.c. This section
+introduces callback-based audio playback, as proposed by Paul Davis on the 
+linux-audio-dev mailinglist. Section 7. provides a short introduction to 
+MIDI scheduling on ALSA sequencer queues based on the small arpeggiator
+miniArp.c as example.
+
+It is recommended to also have a look at the doxygen-generated function 
+reference of the ALSA library.
+
+Compiling an ALSA application: Just use -lasound and make sure you have 
+                               included #include <alsa/asoundlib.h>
+
+
+2. Basic PCM audio 
+------------------
+
+To write a simple PCM application for ALSA 0.9.0 we first need a handle for
+the PCM device. Then we have to specify the direction of the PCM stream,
+which can be either playback or capture. We also have to provide some
+information about the configuration we would like to use, like buffer size, 
+sample rate, pcm data format. So, first we declare:
+  
+  /* Handle for the PCM device */
+  snd_pcm_t *pcm_handle;         
+
+  /* Playback stream */
+  snd_pcm_stream_t stream = SND_PCM_STREAM_PLAYBACK;
+
+  /* This structure contains information about    */
+  /* the hardware and can be used to specify the  */      
+  /* configuration to be used for the PCM stream. */ 
+  snd_pcm_hw_params_t *hwparams;
+
+The most important ALSA interfaces to the PCM devices are the "plughw" and the
+"hw" interface. If you use the "plughw" interface, you need not care much
+about the sound hardware. If your soundcard does not support the sample rate 
+or sample format you specify, your data will be automatically converted.
+This also applies to the access type and the number of channels. 
+With the "hw" interface, you have to check whether your hardware supports
+the configuration you would like to use. 
+
+  /* Name of the PCM device, like plughw:0,0          */
+  /* The first number is the number of the soundcard, */
+  /* the second number is the number of the device.   */
+  char *pcm_name;
+
+Then we initialize the variables and allocate a hwparams structure:
+
+  /* Init pcm_name. Of course, later you */
+  /* will make this configurable ;-)     */
+  pcm_name = strdup("plughw:0,0");
+  
+  /* Allocate the snd_pcm_hw_params_t structure on the stack. */
+  snd_pcm_hw_params_alloca(&hwparams);
+
+Now we can open the PCM device:
+
+  /* Open PCM. The last parameter of this function is the mode. */
+  /* If this is set to 0, the standard mode is used. Possible   */
+  /* other values are SND_PCM_NONBLOCK and SND_PCM_ASYNC.       */ 
+  /* If SND_PCM_NONBLOCK is used, read / write access to the    */
+  /* PCM device will return immediately. If SND_PCM_ASYNC is    */
+  /* specified, SIGIO will be emitted whenever a period has     */
+  /* been completely processed by the soundcard.                */
+  if (snd_pcm_open(&pcm_handle, pcm_name, stream, 0) < 0) {
+    fprintf(stderr, "Error opening PCM device %s\n", pcm_name);
+    return(-1);
+  }
+
+Before we can write PCM data to the soundcard, we have to specify access
+type, sample format, sample rate, number of channels, number of periods 
+and period size. First, we initialize the hwparams structure with the full 
+configuration space of the soundcard. 
+
+  /* Init hwparams with full configuration space */
+  if (snd_pcm_hw_params_any(pcm_handle, hwparams) < 0) {
+    fprintf(stderr, "Can not configure this PCM device.\n");
+    return(-1);
+  }
+
+Information about possible configurations can be obtained with a set of
+functions named
+
+  snd_pcm_hw_params_can_<capability>
+  snd_pcm_hw_params_is_<property>
+  snd_pcm_hw_params_get_<parameter>
+
+The availability of the most important parameters, namely access type, 
+buffer size, number of channels, sample format, sample rate and 
+number of periods, can be tested with a set of functions named
+
+  snd_pcm_hw_params_test_<parameter> 
+
+These query functions are especially important if the "hw" interface is
+used. The configuration space can be restricted to a certain configuration 
+with a set of functions named
+
+  snd_pcm_hw_params_set_<parameter>
+
+For this example, we assume that the soundcard can be configured for
+stereo playback of 16 Bit Little Endian data, sampled at 44100 Hz.
+Accordingly, we restrict the configuration space to match this
+configuration: 
+
+  int rate = 44100; /* Sample rate */
+  int periods = 2;     /* Number of periods */
+  int periodsize = 8192; /* Periodsize (bytes) */
+
+The access type specifies the way in which multichannel data is stored in the
+buffer. For INTERLEAVED access, each frame in the buffer contains the
+consecutive sample data for the channels. For 16 Bit stereo data, this
+means that the buffer contains alternating words of sample data for the left
+and right channel. For NONINTERLEAVED access, each period contains first all
+sample data for the first channel followed by the sample data for the second
+channel and so on.
+  
+  /* Set access type. This can be either    */
+  /* SND_PCM_ACCESS_RW_INTERLEAVED or       */
+  /* SND_PCM_ACCESS_RW_NONINTERLEAVED.      */
+  /* There are also access types for MMAPed */
+  /* access, but this is beyond the scope   */
+  /* of this introduction.                  */
+  if (snd_pcm_hw_params_set_access(pcm_handle, hwparams, SND_PCM_ACCESS_RW_INTERLEAVED) < 0) {
+    fprintf(stderr, "Error setting access.\n");
+    return(-1);
+  }
+  
+  /* Set sample format */
+  if (snd_pcm_hw_params_set_format(pcm_handle, hwparams, SND_PCM_FORMAT_S16_LE) < 0) {
+    fprintf(stderr, "Error setting format.\n");
+    return(-1);
+  }
+
+  /* Set sample rate. If the exact rate is not supported */
+  /* by the hardware, use nearest possible rate.         */ 
+  if (snd_pcm_hw_params_set_rate_near(pcm_handle, hwparams, rate, 0) < 0) {
+    fprintf(stderr, "Error setting rate.\n");
+    return(-1);
+  }
+
+  /* Set number of channels */
+  if (snd_pcm_hw_params_set_channels(pcm_handle, hwparams, 2) < 0) {
+    fprintf(stderr, "Error setting channels.\n");
+    return(-1);
+  }
+
+  /* Set number of periods. Periods used to be called fragments. */ 
+  if (snd_pcm_hw_params_set_periods(pcm_handle, hwparams, periods, 0) < 0) {
+    fprintf(stderr, "Error setting periods.\n");
+    return(-1);
+  }
+
+The unit of the buffersize depends on the function. Sometimes it is given in
+bytes, sometimes the number of frames has to be specified. One frame is the
+sample data vector for all channels. For 16 Bit stereo data, one frame has a
+length of four bytes.   
+
+  /* Set buffer size (in frames). The resulting latency is given by */
+  /* latency = periodsize * periods / (rate * bytes_per_frame)     */
+  if (snd_pcm_hw_params_set_buffer_size(pcm_handle, hwparams, (periodsize * periods)>>2) < 0) {
+    fprintf(stderr, "Error setting buffersize.\n");
+    return(-1);
+  }
+
+Now we apply the configuration to the PCM device pointed to by pcm_handle.
+This will also prepare the PCM device. 
+  
+  /* Apply HW parameter settings to */
+  /* PCM device and prepare device  */
+  if (snd_pcm_hw_params(pcm_handle, hwparams) < 0) {
+    fprintf(stderr, "Error setting HW params.\n");
+    return(-1);
+  }
+
+After the PCM device is configured, we can start writing PCM data to it.
+The first write access will start the PCM playback. For interleaved write 
+access, we use the function
+   
+  /* Write num_frames frames from buffer data to    */ 
+  /* the PCM device pointed to by pcm_handle.       */
+  /* Returns the number of frames actually written. */
+  snd_pcm_sframes_t snd_pcm_writei(pcm_handle, data, num_frames);
+
+For noninterleaved access, we would have to use the function
+
+  /* Write num_frames frames from buffer data to    */ 
+  /* the PCM device pointed to by pcm_handle.       */ 
+  /* Returns the number of frames actually written. */
+  snd_pcm_sframes_t snd_pcm_writen(pcm_handle, data, num_frames);
+
+After the PCM playback is started, we have to make sure that our
+application sends enough data to the soundcard buffer. Otherwise, a
+buffer underrun will occur. After such an underrun has occured,
+snd_pcm_prepare should be called. A simple stereo saw wave could be
+generated this way:
+
+  unsigned char *data;
+  int pcmreturn, l1, l2;
+  short s1, s2;
+  int frames;
+
+  data = (unsigned char *)malloc(periodsize);
+  frames = periodsize >> 2;
+  for(l1 = 0; l1 < 100; l1++) {
+    for(l2 = 0; l2 < num_frames; l2++) {
+      s1 = (l2 % 128) * 100 - 5000;  
+      s2 = (l2 % 256) * 100 - 5000;  
+      data[4*l2] = (unsigned char)s1;
+      data[4*l2+1] = s1 >> 8;
+      data[4*l2+2] = (unsigned char)s2;
+      data[4*l2+3] = s2 >> 8;
+    }
+    while ((pcmreturn = snd_pcm_writei(pcm_handle, data, frames)) < 0) {
+      snd_pcm_prepare(pcm_handle);
+      fprintf(stderr, "<<<<<<<<<<<<<<< Buffer Underrun >>>>>>>>>>>>>>>\n");
+    }
+  }
+
+If we want to stop playback, we can either use snd_pcm_drop or
+snd_pcm_drain. The first function will immediately stop the playback and
+drop pending frames. The latter function will stop after pending frames have
+been played.
+
+  /* Stop PCM device and drop pending frames */
+  snd_pcm_drop(pcm_handle);
+
+  /* Stop PCM device after pending frames have been played */ 
+  snd_pcm_drain(pcm_handle);
+
+
+3. PCM capture  
+--------------
+
+It is not possible to use one pcm handle for both playback and capture. So
+you have to configure two handles if you want to access the PCM device in
+both directions. The snd_pcm_open function now has to be called with stream 
+set to SND_PCM_STREAM_CAPTURE.
+
+  /* Capture stream */
+  snd_pcm_stream_t stream_capture = SND_PCM_STREAM_CAPTURE;
+
+The other settings are identical to the playback settings.
+For interleaved capture, we call
+
+  /* Read num_frames frames from the PCM device  */
+  /* pointed to by pcm_handle to buffer capdata. */
+  /* Returns the number of frames actually read. */
+  snd_pcm_readi(pcm_capture_handle, capdata, num_frames);
+
+For noninterleaved access, we would have to use the function
+
+  /* Read num_frames frames from the PCM device  */         
+  /* pointed to by pcm_handle to buffer capdata. */      
+  /* Returns the number of frames actually read. */   
+  snd_pcm_readn(pcm_capture_handle, capdata, num_frames);
+
+As in the case of playback, we have to take care that the application calls
+the read function before the capture buffer of the soundcard is completely filled.
+Otherwise there will be a buffer overrun.
+
+  int pcmreturn;
+
+  while ((pcmreturn = snd_pcm_readi(pcm_capture_handle, capdata, periodsize>>2)) < 0) {
+    snd_pcm_prepare(pcm_capture_handle);
+    fprintf(stderr, "<<<<<<<<<<<<<<< Buffer Overrun >>>>>>>>>>>>>>>\n");
+  }
+
+
+4. Writing a sequencer client
+-----------------------------
+
+The example seqdemo.c demonstrates how to create a simple client for the
+ALSA sequencer. This client can receive MIDI data from other clients and it
+displays NOTE ON/OFF, 7-bit CONTROLLER and PITCHBENDER events. Let's have a
+look at the functions of seqdemo.c:
+
+a) snd_seq_t *open_seq() 
+
+This function uses snd_seq_open to create a new client for the ALSA
+sequencer. Since we only want to receive MIDI events, the parameter
+streams is set to SND_SEQ_OPEN_INPUT. The client is given a name 
+using snd_seq_set_client_name. Now we need a port which can receive MIDI
+events. We create it by calling snd_seq_create_simple_port. Here, we have to 
+specify the capabilities of the port. SND_SEQ_PORT_CAP_WRITE allows write
+access and SND_SEQ_PORT_CAP_SUBS_WRITE allows other clients to subscribe to 
+the port as writeable port. Since our application reads from the port, we
+would have to add SND_SEQ_PORT_CAP_READ, but at the moment, this can be
+omitted since it is not checked. 
+
+b) void midi_action(snd_seq_t *seq_handle)
+
+This function retrieves an event from the input buffer of the ALSA sequencer
+by calling snd_seq_event_input. The event is processed and then freed using
+snd_seq_free_event. The loop is repeated until the input buffer is
+empty. This is checked with snd_seq_input_pending, which returns the byte
+size of the events remaining in the input buffer.
+
+c) int main(int argc, char *argv[])
+
+seqdemo.c uses polling to check whether there are incoming MIDI events.
+snd_seq_poll_descriptors_count returns the number of poll descriptors for
+input polling events (parameter POLLIN). At present, this is always 1. Then
+a struct pollfd is allocated on the stack and initialized using
+snd_seq_poll_descriptors. The call to poll returns either if a MIDI event
+can be read from the ALSA sequencer or after timeout. You can check the
+manpage of poll if you are not familiar with polling.
+
+
+5. A MIDI router
+----------------
+
+ALSA makes it very easy to implement any MIDI router you can think of.
+midiroute.c provides a simple example. It creates one input port and two
+ouput ports. The program takes the parameter split_point. Input note 
+events with note < split_point are routed to the first output port, all 
+other note events are routed to the second output port. Any other events
+(e.g. control or pitchbender events) are routed to both output ports
+simultaneously. Of course you can easily modify this in various ways by 
+only changing the if conditions in the function midi_route. You can 
+e.g. have different instrument played depending on the velocity. Let's 
+see how it works: 
+
+a) int open_seq(snd_seq_t **seq_handle, int in_ports[], int out_ports[], int
+                num_in, int num_out)
+
+Here, we open the ALSA sequencer with SND_SEQ_OPEN_DUPLEX, since we would
+like to read and write MIDI events. Since we need the port IDs to
+distinguish between the different output ports, we have to store the return
+value of snd_seq_create_simple_port. In addition to a) in the previous
+section, we also create output ports. To let other clients read from them,
+we have to allow read access and read subscription. It is not necessary to
+explicitely allow write access as well, although the application itself writes 
+to the output port. At present, a client can always access its ports without
+explicit permission. 
+
+b) void midi_route(snd_seq_t *seq_handle, int out_ports[], int pick_channel)
+
+As in 4. b) snd_seq_event_input is used to read single events from the input
+buffer. Now we would like to route the event to one of the output ports. 
+Since it is more flexible to allow arbitrary clients to subscribe to the
+output ports and receive the events, we do not explicitely specify the
+destination with snd_seq_ev_set_dest. Instead, we call snd_seq_ev_set_source
+to make the event originate from the desired output port. The function
+snd_seq_ev_set_subs will then set all subscribers to the output port as
+destination. We would like to output the event as quickly as possible.
+Therefore, we call snd_seq_ev_set_direct to bypass event queueing (this sets
+the queue for the event to SND_SEQ_QUEUE_DIRECT).
+Then we call snd_seq_event_output_direct for unbuffered output of the event.
+
+By modifying the arguments of the if conditions, you can easily implement
+different routing behaviour. 
+
+Examples: if (ev->data.control.channel < split_channel) : channel splitting
+          if (ev->data.note.velocity < threshold)     : velocity dependence
+          if (ev->type == SND_SEQ_EVENT_CONTROLLER) : extract controller events
+
+c) int main(int argc, char *argv[])
+
+Well, this is not essentially different from 4. c).
+
+
+6. Combining PCM and MIDI: miniFMsynth
+--------------------------------------
+
+The tiny synthesizer miniFMsynth demonstrates MIDI event processing and PCM
+playback. It takes several parameters:
+
+miniFMsynth <device> <FM> <harmonic> <subharmonic> <transpose> <a> <d> <s> <r> 
+
+<device>        : PCM device
+<FM>            : Strength of the frequency modulation
+<harmonic>      : Harmonic of the master oscillator (integer)
+<subharmonic>   : Subharmonic of the master oscillator (integer)
+<transpose>     : Note offset for both oscillators (integer)
+<a> <d> <s> <r> : Attack, Decay, Sustain, Release
+
+Harpsichord: ./miniFMsynth plughw:0 6.5 3 5 24 0.01 0.2 0.3 0.1
+Bell       : ./miniFMsynth plughw:0 3.5 7 9 0 0.01 0.2 0.3 1.5
+Oboe       : ./miniFMsynth plughw:0 0.7 1 3 24 0.05 0.3 0.8 0.2
+
+miniFMsynth reacts on pitchbender and modulation wheel events. Since it is
+not optimized with respect to performance (you would e.g. never call the
+expensive sin function in a "real" program), you might have to decrease the
+polyphony in the source by modifying the #define POLY.
+
+Having read the previous sections, it should be easy to understand the MIDI
+part of the program. As to PCM playback, miniFMsynth uses polling for this
+purpose as well.  This technique is more advanced than the direct output
+described in section 2. Let's have a look at some interesting details:
+
+a) snd_pcm_t *open_pcm(char *pcm_name)
+
+Most of the snd_pcm_hw_params functions called here are already known from
+section 2. However, here we do not specify the buffersize, but we set the
+periodsize instead. 
+Since we would like to use polling for PCM output, we also have to set the 
+software parameter avail_min. A poll on a PCM file descriptor will then only
+return if at least avail_min frames can be written to the device. We
+initialize a snd_pcm_sw_params_t with the current configuration calling
+snd_pcm_sw_params_current, then set avail_min with snd_pcm_sw_params_set_avail_min 
+and activate this configuration by calling snd_pcm_sw_params.
+
+b) double envelope(int *note_active, int gate, double *env_level, double t,
+                   double attack, double decay, double sustain, double release)
+
+If gate==1, the note is still pressed ==> the envelope is in the attack, decay,
+sustain area. If gate==0, the envelope is in the release area. If t>release,
+the respective oscillator cell is freed by setting note_active to zero. 
+
+c) int midi_callback()
+
+Most of this is already known from section 4. When a NOTEON event is
+received, a new oscillator cell is initialized by setting the respective 
+note_active to 1. This only works if the polyphony is not exceeded,
+otherwise the note is omitted. If you don't like this, you can modify it
+and let e.g. the oscillator cell with the lowest env_level be freed and
+used for the new note.
+There is one important detail about note events: Some keyboards 
+(e.g. Kawai MP 9000) do not send NOTEOFF events, but send a NOTEON 
+with velocity 0 instead. In this case, you have to add the lines
+
+if ((ev->type == SND_SEQ_EVENT_NOTEON) && (ev->data.note.velocity == 0)) 
+    ev->type = SND_SEQ_EVENT_NOTEOFF;
+
+directly after snd_seq_event_input.
+
+d) int playback_callback (snd_pcm_sframes_t nframes)
+
+This processes the PCM data and sends it to the device by calling
+snd_pcm_writei. This call will immediately return since we only call 
+playback_callback if we know that at least nframes can be written to the
+PCM device. miniFMsynth always writes chunks of fixed size, so nframes
+always equals BUFSIZE.
+
+e) int main (int argc, char *argv[])
+
+Here, we use polling both for MIDI event input and for PCM playback.
+The call to poll will return either if a MIDI event can be read from the
+sequencer input buffer or if at least avail_min (== BUFSIZE) frames can be
+written to the PCM device. If the PCM data is not delivered to the PCM
+device before the buffer of the soundcard is empty, a buffer underrun
+occurs. This will cause the playback to stop. In this case, the return value
+of snd_pcm_writei will be smaller than BUFSIZE. We then have to restart the
+playback by calling snd_pcm_prepare. 
+
+
+7. Scheduling MIDI events: miniArp
+----------------------------------
+
+In section 5. we have used immediate output of MIDI events. However, MIDI
+events are usually scheduled on a queue which is driven by a hardware timer.
+The arpeggiator miniArp provides a simple example for MIDI scheduling.
+miniArp takes two parameters, the tempo (beats per minute) and the filename
+of the sequence to be looped. This sequence file has to be made up of one
+single line of single characters. Each note is characterized by 4 or 5
+characters vwxyz, where 
+
+v is the note ('c', 'd', 'e', 'f', 'g', 'a', 'h'), 
+w is an optional sharp ('#'), 
+x specifies the octave, 
+y and z denote the length of the note and the interval between this note 
+and the following note. Both values are given as a fraction of a 
+quarter note: length = 1 / y quarters.
+
+A valid sequence would be:
+
+c488c#488d488d#488e484c584g584c684e684g584c684e544c584g484e488d#488d488c#488
+
+miniArp processes pitchbender and modulation wheel events. Just try it out.
+Any NOTEON event will transpose the sequence according to the difference of
+the pressed note and the middle C.
+
+Now, what are the secrets of this program ? Many techniques are already
+known from other sections. The interesting functions are init_queue, 
+set_tempo, arpeggio, clear_queue, and get_tick. A signal handler for SIGINT
+and SIGTERM is implemented to avoid persisting notes.
+
+a) void init_queue()
+
+This allocates a queue and sets its buffer size. The buffer size is passed 
+to snd_seq_set_client_pool_output as the number of events. While gaining
+experience with queues it might be helpful to have a look at 
+/proc/asound/seq/queues.
+
+b) void set_tempo()
+
+The schedule time of events can be given either in realtime or in ticks. If
+you would like to vary the tempo, it is convenient to specify the time
+in ticks. This will allow to even change the tempo of events which already 
+have been scheduled on the queue. The tempo is passed to
+snd_seq_queue_tempo_set_tempo in microseconds per tick. The function
+snd_seq_queue_tempo_set_ppq sets the ticks per quarter. Usually, one would
+like to specify the tempo in beats per minute (bpm). Therefore set_tempo 
+calculates the correct tempo and ppq parameters from bpm.
+
+c) void arpeggio()
+
+Here, all the notes of the sequence are scheduled on the queue. First, we
+have to clear the event structure. Then, we define a note event of fixed
+length by calling snd_seq_ev_set_note. This note event is scheduled by  
+specifying its tick time with snd_seq_ev_schedule_tick. The source of the
+event is the output port of miniArp and we call snd_seq_set_subs to tell
+ALSA that we would like the event to be passed to all subscribers of this
+port. Finally, we use snd_seq_event_output_direct for unbuffered output of
+the event to the queue. 
+Note events work as follows: At their scheduled time, they create a NOTEON
+event and then convert themselves to a NOTEOFF event which is scheduled at 
+the current time plus note length.
+Since we would like the sequence to be looped, we schedule a
+SND_SEQ_EVENT_ECHO event after each sequence. This time, the destination
+is the application itself. When the SND_SEQ_EVENT_ECHO event is dispatched, 
+it will cause the poll function in main() to return and midi_action is
+called. In midi_action, SND_SEQ_EVENT_ECHO will result in a call to
+arpeggio and the loop is complete. 
+
+d) void clear_queue()
+
+When miniArp receives a NOTEON event, the sequence is transposed.
+clear_queue is called on each NOTEON event to trigger a new sequence.
+SND_SEQ_REMOVE_OUTPUT | SND_SEQ_REMOVE_IGNORE_OFF is passed to
+snd_seq_remove_events_set_condition to tell ALSA that only output events
+should be removed from the queue and NOTEOFF events should not be deleted.
+The latter condition ensures that all notes of the sequence receive a
+NOTEOFF event after their length has elapsed, even when a new sequence is
+triggered.
+
+e) snd_seq_tick_time_t get_tick()
+
+This functions retrieves the current tick value from a queue status
+structure.
+
+
+8. Notes on writing a GUI based audio application
+-------------------------------------------------
+
+You probably would like to use PCM audio in a GUI based application. In this
+case it is recommended to use two threads, an audio thread and a GUI thread.
+Both threads can then communicate e.g. via shared memory. This also has the
+advantage that you can increase the priority of the audio thread seperately
+from the priority of the GUI thread. A sample audio thread could look like
+
+while(shared_data->do_audio) {
+    process_buffer(buf, bufsize);
+    while ((pcm_return = snd_pcm_writei(pcm_handle, buf, bufsize)) < 0) {
+        snd_pcm_prepare(pcm_handle);
+        fprintf(stderr, "xrun !\n");
+    }
+}
+
+It is not necessary to use polling in this case since snd_pcm_writei will
+block until bufsize frames can be written to the device.
