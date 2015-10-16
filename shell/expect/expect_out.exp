@@ -1,0 +1,35 @@
+#expect "hi\n"
+#send "you typed $expect_out(buffer)"
+#send "but I only expected $expect_out(0,string)"
+#
+## test caret^ character
+#expect "^hi"
+#send "you typed $expect_out(buffer)"
+#send "but I only expected $expect_out(0,string)"
+
+# test dallar$ character
+#expect "hi$"
+#send "you typed $expect_out(buffer)"
+#send "but I only expected $expect_out(0,string)"
+
+#while 1 {
+#	expect "hi"
+#	send "$expect_out(0,string) $expect_out(buffer)"
+#}
+
+#set timeout 10
+#while 1 {
+#	expect {
+#		-re "hi" {
+#			send "$expect_out(0,string) $expect_out(buffer)"
+#			break;
+#		}
+#
+#	timeout {
+#		exit
+#	}
+#	}
+#}
+expect "hi" { send "You said hi\n" } \
+"hello" { send "Hello yourself\n" } \
+"bye" { send "That was unexpected\n"}

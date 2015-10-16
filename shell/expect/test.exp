@@ -1,0 +1,6 @@
+#!/usr/bin/expect --
+set timeout $argv
+expect "\n" {
+# send [string trimright "$expect_out(buffer)" "\n"]
+send "$expect_out(buffer)"
+}
