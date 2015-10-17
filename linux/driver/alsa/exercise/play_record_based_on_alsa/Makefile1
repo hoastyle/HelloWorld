@@ -1,0 +1,16 @@
+LDFLAGS = -lasound
+
+common_objects = sndwav_common.o wav_parser.o
+
+all: play record
+
+play: lplay.o $(common_objects) 
+	cc -o play lplay.o $(common_objects) $(LDFLAGS)
+
+record: lrecord.o $(common_objects)
+	cc -o record lrecord.o $(common_objects) $(LDFLAGS)
+
+.PHONY : clean
+
+clean:
+	rm -rf play record *.o
