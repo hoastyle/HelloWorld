@@ -1,0 +1,13 @@
+#ifndef __ADI_OSAL_ARCH_H__
+#define __ADI_OSAL_ARCH_H__
+
+#if !defined (__ADSPBLACKFIN__)
+    #error "Unknown processor family"
+#endif
+
+
+#if defined(_LANGUAGE_C)
+
+#endif /* _LANGUAGE_C */
+
+#endif /* __ADI_OSAL_ARCH_H__ */

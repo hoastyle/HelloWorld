@@ -1,0 +1,29 @@
+K 25
+svn:wc:ra_dav:version-url
+V 67
+/svn/swe/!svn/ver/31348/rtos/trunk/noos/osal/Projects/Blackfin/CCES
+END
+project.tmpl
+K 25
+svn:wc:ra_dav:version-url
+V 80
+/svn/swe/!svn/ver/31348/rtos/trunk/noos/osal/Projects/Blackfin/CCES/project.tmpl
+END
+cproject.tmpl
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/svn/swe/!svn/ver/31348/rtos/trunk/noos/osal/Projects/Blackfin/CCES/cproject.tmpl
+END
+osal_projects.cfg
+K 25
+svn:wc:ra_dav:version-url
+V 85
+/svn/swe/!svn/ver/31348/rtos/trunk/noos/osal/Projects/Blackfin/CCES/osal_projects.cfg
+END
+generate_projects.py
+K 25
+svn:wc:ra_dav:version-url
+V 88
+/svn/swe/!svn/ver/11368/rtos/trunk/noos/osal/Projects/Blackfin/CCES/generate_projects.py
+END

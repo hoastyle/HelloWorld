@@ -1,0 +1,263 @@
+10
+
+dir
+32427
+https://dspeng.spd.analog.com/svn/swe/rtos/trunk/noos/osal/Projects/Blackfin/CCES
+https://dspeng.spd.analog.com/svn/swe
+
+
+
+2015-06-09T14:38:16.625670Z
+31348
+sfernan
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+faaaf02c-4cd7-11db-87e5-fa36deddc86e
+
+project.tmpl
+file
+
+
+
+
+2015-10-16T02:52:58.464834Z
+b687d06029adc4a96be9abb3ad2113ee
+2015-06-09T14:38:16.625670Z
+31348
+sfernan
+has-props
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+1518
+
+libosal522_any
+dir
+
+libosal523_any
+dir
+
+libosal542_any
+dir
+
+libosal561_any
+dir
+
+libosal707_any
+dir
+
+generate_projects.py
+file
+
+
+
+
+2015-10-16T02:52:58.464834Z
+3f0b5a3e077b7f864938dd4a72a4d489
+2011-03-02T17:03:21.691752Z
+9847
+sfernan
+has-props
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+10206
+
+libosal609_any
+dir
+
+libosal506f_any
+dir
+
+libosal523_none
+dir
+
+libosal707_0.0
+dir
+
+libosal561_none
+dir
+
+libosal707_1.0
+dir
+
+libosal707_none
+dir
+
+libosal609_0.1
+dir
+
+libosal609_0.2
+dir
+
+libosal561_0.5
+dir
+
+osal_projects.cfg
+file
+
+
+
+
+2015-10-16T02:52:58.468834Z
+94772ef61e60933c404db7095eb2440a
+2015-06-09T14:38:16.625670Z
+31348
+sfernan
+has-props
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+2137
+
+libosal592-a_any
+dir
+
+libosal592-a_0.1
+dir
+
+libosal592-a_none
+dir
+
+libosal512_any
+dir
+
+cproject.tmpl
+file
+
+
+
+
+2015-10-16T02:52:58.464834Z
+8822eea7b8a2eaa6ef1cba26f604c592
+2015-06-09T14:38:16.625670Z
+31348
+sfernan
+has-props
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+22474
+
+libosal532_any
+dir
+
+libosal534_any
+dir
+
+libosal538_any
+dir
+
+libosal512_none
+dir
+
+libosal522_none
+dir
+
+libosal532_none
+dir
+
+libosal542_none
+dir
+
+libosal534_none
+dir
+
+libosal532_0.5
+dir
+
+libosal534_0.3
+dir
+
+libosal609_none
+dir
+
+libosal538_none
+dir
+
+libosal506f_none
+dir
+
+libosal538_0.4
+dir
+

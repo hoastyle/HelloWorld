@@ -1,0 +1,1186 @@
+<?xml version="1.0" encoding="utf-8"?>
+<?xml-stylesheet href="antscript_style.xslt" type="text/xsl"?>
+
+<!--Desc: This file drives the automated build of the OSAL Libraries -->
+
+<!--The process involves the following major steps:
+    1) Check out the libraries sources from SVN repository
+    2) Build the libraries
+    3) Check that examples provided with CCES build successfully.
+
+    The steps above are broken into several build targets which are described below.
+
+    User Targets:
+
+    all             cleans, installs CCES, build all dpjs, relocate and package the dlbs
+    clean_all       removes the build artefacts and previously created VisualDSP installations
+    install_cces    installs a new instance of VisualDSP
+    install_osal    gets the latest revision from SVN and installs it
+    build           checks out the OSAL sources from SVN and build the libraries
+    test            verifies that the libraries built are functional but rebuilding all examples with them
+    package         packages the output (sources & libs) into a zip file
+    report_results  reports the results and update the logs
+
+    -->
+
+
+<!-- Note: this project is using additional Ant packages: SVNANT and ANTELOPE -->
+
+<project name="OSAL_Library_Build" default="all" xmlns:a="antlib:ise.antelope.tasks" >
+  <description>Builds the OSAL on no OS package using the latest released CCES version </description>
+
+  <taskdef resource="org/tigris/subversion/svnant/svnantlib.xml" classpath="svnant.jar" />
+
+
+
+<!--#############################################################################################-->
+<!--Below is the list of properties set up for use in commands throughout the build file.        -->
+<!--.............................................................................................-->
+
+  <!-- CCES options: Now based on Crosscore Studio Embedded -->
+  <property name="baseProductName"          value="Crosscore" />
+
+  <!-- OSAL specific definitions -->
+  <property name="SVN_stage_branch"         value="https://dspeng.spd.analog.com/svn/swe/rtos" />
+  <property name="SVN_Build_Target"         value="branches/cces_2_0_0" />
+  <property name="SVN_SourcesLocation"      value="${SVN_stage_branch}/${SVN_Build_Target}" />
+  <property name="SVN_ScriptsLocation"      value="${SVN_stage_branch}/${SVN_Build_Target}/scripts" />
+
+<!-- "BaseKitInstallDir" is set in the Jenkins job properties -->
+  
+<!-- Script properties -->
+
+  <!-- Directories: -->
+  <property name="currentDir" location="." />
+  <property name="BaseKitInstallCache" location="${currentDir}\cces_install_cache\base"/>
+  <property name="UpdateKitInstallCache" location="${currentDir}\cces_install_cache\update"/>
+  <property name="tempDir" location="${currentDir}\temp" />
+  <property name="PackagesDir" location="${tempDir}\packages" />
+  <property name="VduPackageDir" location="${PackagesDir}\vdu_package" />
+  <property name="CCESKitUnzipDir" location="${PackagesDir}\cces_kit_unzip" />
+  <property name="OSAL_TempCheckoutDir" location="${tempDir}\OSAL_temp_Sources_Checkout" />
+  <property name="OSAL_StageDir" location="${tempDir}\OSAL_StageFolder" />
+  <property name="OSAL_BuildStatusDir" location="${tempDir}\build_status" />
+  <property name="OSAL_BuildResultDir" location="${tempDir}\build_results" />
+  <property name="autoDPJTempDir" location="${tempDir}\autoDpjs" />
+  <property name="SupportFilesDir" location="${currentDir}\support_files"/>
+  <property name="SQERepo_Checkout" location="${tempDir}\SQE_Repo"/>
+
+  <property name="targetModuleRootFolder"   value="${OSAL_TempCheckoutDir}" />
+  <property name="dlbRelocDstBlackfin"      location="${BaseKitInstallDir}\Blackfin\lib"/>
+  <property name="dlbRelocDstSharc"         location="${BaseKitInstallDir}\Sharc\lib"/>
+  <property name="dlbRelocDstArm"         location="${BaseKitInstallDir}\ARM\arm-none-eabi\arm-none-eabi\lib"/>
+  <property name="OSAL_PackageDir"          location="${tempDir}\OSAL_PackageFolder" />
+  
+  <!-- OSAL NOOS -->
+  <property name="dlbOsalNoosBlackfin"  location="${targetModuleRootFolder}\noos\osal\Projects\Blackfin\CCES"/>
+  <property name="dlbOsalNoosSharc"     location="${targetModuleRootFolder}\noos\osal\Projects\Sharc\CCES"/>
+  <property name="dlbOsalNoosArm"       location="${targetModuleRootFolder}\noos\osal\Projects\ARM-Cortex-A5\CCES"/>
+
+  <!-- Files: -->
+  <property name="OSAL_Build_Output" value="${OSAL_BuildResultDir}\Final_Build_Results.txt"/>
+  <property name="LicenseFile" value="${SupportFilesDir}\license.dat"/>
+
+  <!-- Utilities: -->
+  <property name="killExe" value="${currentDir}\utilities\killprocess.exe" />
+  <property name="powerExe" value="${currentDir}\utilities\powerCycle\powerCycle.exe" />
+  <property name="pythonExe" value="c:\Python26\python26.exe" />
+  <property name="SvnExe" value="svn.exe" />
+
+  <!-- Scripts: -->
+  <property name="OSALLibBuildScript" value="build_libs.py"/>
+  <property name="testBuildScript" value="testBuild.py"/>
+  <property name="SendMailScript" value="sendMail.py"/>
+  <property name="GenerateSVNDiffEmail" value="email_svn_diff.py" />
+  <property name="ParseManifestScript" value="ssl_manifest.py"/>
+
+  <!-- Miscellaneous: -->
+  <property name="procsToKill" value="Idde.exe,ccts.exe,ccblkfn.exe,cc21k.exe,easmts.exe,linker.exe,compiler.exe,jitccs532.exe" />
+  <property name="build.rebuild_objs" value="yes" /> 
+  <property name="OSAL_BuildMailList" value="matthew.teris@analog.com"/>
+  <property name="OSAL_BuildEmailAddress" value="OSAL Build machine &lt;Ant_SSL_Builder@analog.com&gt;" />
+  
+  <!-- The default SVN username is AutoBuild, however using this username, SVN operations are very slow. In order to make the 
+       operations faster, you can specify your NT username and password. Make sure to NOT checking it in. 
+       It can be specified in the 'svn_credentials.conf' file in this folder. That file cannot be checked into SVN. You can specify it 
+       the following way:
+       svn.username = <username>
+       svn.password = <password>
+   -->
+  <property name="svn.username" value="testlab2" />
+  <property name="svn.password" value="Labrat1" />
+
+
+
+  <a:if name="build.rebuild_objs" value="yes">
+    <property name="build.rebuild_arg" value="-r"/>
+    <else>
+      <property name="build.rebuild_arg" value=""/>
+    </else>
+  </a:if>
+        
+
+  <property environment="env"/>
+
+<!--#####################################################################################################################-->
+<!-- The following is the list of targets defined to group all of the tasks required to complete the OSAL Release process -->
+
+
+<!--
+================================================
+    Target: all
+================================================
+-->
+  <target name="all"
+          description="does a complete build cycle: install and build OSAL, test and package"
+          depends="build,test,package,report_results">
+
+  </target>
+
+
+<!--
+================================================
+    Target: rebuild_all
+================================================
+-->
+  <target name="rebuild_all"
+          description="does a fresh complete build cycle: clean, install and build OSAL, test and package"
+          depends="clean_all,build,package">
+
+  </target>
+
+
+<!--
+================================================
+    Target: clean_all
+================================================
+-->
+  <target name="clean_all"
+          description="Rebuilds from fresh after cleaning all previously built artifacts">
+
+    <!-- remove intermediate and scratch folders -->
+    <delete dir="${tempDir}" />
+    <delete dir="C:\Python26\Lib\site-packages\win32com\gen_py\1B51DCE0-C473-11D4-8A7B-00C04F5531CFx0x1x0.py" />
+    <delete dir="C:\Python26\Lib\site-packages\win32com\gen_py\1B51DCE0-C473-11D4-8A7B-00C04F5531CFx0x1x0.pyc" />
+
+    <!-- create temp folder -->
+    <mkdir dir="${tempDir}"/>
+  </target>
+
+
+
+<!--
+================================================
+    Target: help
+================================================
+-->
+  <target name="help"
+          description="Print help on the build process">
+
+        <echo>
+OSAL Build script
+--------------------
+
+This is the script used to build the OSAL libraries. The process is
+done in several stages:
+
+1 - Installation of the OSAL source files  [target: install_osal]
+    The source files are installed if anything has changed on the Subversion
+    server. The Stage vs. Manifest script is then run to verify that all new
+    files additions/deletion are actually intended.
+
+2 - Build the Libraries using the latest sources [target: build]
+    A script is invoked to go through all the project files in the checked out
+    folder and run a CCES build on each of them.
+    Project files that end with *auto.dpj are not built because they are
+    dependent on the hardware target silicon revision. They are there only for
+    the final user, the build process ignores them.
+
+3 - Tests the newly built libraries [target: test]
+    In order to test the libraries, all the examples provided with CCES
+    are rebuilt by linking with the new libraries.
+    They need to all build without errors or warnings.
+
+4 - Packages
+    the sources files indicated in the manifest along with the libraries are
+    packaged into a zip file. That file is located in the output result directory
+
+5 - Results
+    Results are reported both by logging them in a logfile (buildlog.xml) and by
+    sending a report email
+
+
+ Target:
+ -------
+    all (default)   cleans, build all projects, relocate and package the dlbs
+    clean_all       removes the build artifacts
+    install_osal    gets the latest revision from SVN and installs it
+    build           checks out the OSAL sources from SVN and build the libraries
+    test            verifies that the libraries built are functional but rebuilding all examples with them
+    package         packages the toolchain output (sources and libs) into a zip file
+    report_results  reports the results and update the logs
+    config          shows the values of the configuration properties
+
+
+Configuration:
+--------------
+
+Configuration can be loaded from the file '${configfile}' by default. The location of
+the file is configurable by changing the value of the following property:
+'configfile'.
+That can be done on the ant commandline by adding : -Dconfigfile="myfile.conf"
+
+value:
+    SVN_stage_branch        location of the SVN branch for that project
+
+    SVN_Build_Target        name of the particular release
+
+    SVN_SourcesLocation     SVN URL to locate the source files
+
+    SVN_ScriptsLocation     SVN URL to locate the build scripts
+
+    BaseKitInstallDir       Location to install CCES. This must be the default CCES
+                            installation path since the libraries will be built
+                            from there. This way debug libraries will point to
+                            source code at the default CCES installation path.
+
+    targetModuleRootFolder  Location of the Root folder where the sources should be
+                            copied to.
+
+    dlbOsalNoosBlackfin Location where the OSAL no-OS libraries will be after the build process
+    dlbRelocDstBlackfin     Location where the OSAL no-OS libraries should eventually
+                            be in the tree to run the toolchain.
+    dlbOsalNoosSharc    Location where the OSAL no-OS libraries will be after the build process
+    dlbRelocDstSharc        Location where the OSAL no-OS libraries should eventually
+                            be in the tree to run the toolchain.
+    dlbOsalNoosArm      Location where the OSAL no-OS libraries will be after the build process
+    dlbRelocDstArm      Location where the OSAL no-OS libraries should eventually
+                            be in the tree to run the toolchain.
+
+	
+    </echo>
+   </target>
+
+
+<!--#####################################################################################################################-->
+<!--                               OSAL Installation related targets                                                      -->
+
+<!--
+================================================
+    Target: install_osal.check_manifest.check
+================================================
+-->
+  <!-- Desc: checks if new commits are present (verifies if the revision of the last commit matches with the revision of the last build) -->
+
+  <target name="install_osal.check_manifest.check">
+
+    <!-- retrieve the latest revision -->
+    <property name="build.last_rev" value="0" />
+	
+    <svn username="${svn.username}" password="${svn.password}"  failonerror="false">
+        <propget url="${SVN_stage_branch}/${SVN_Build_Target}" name="build:last_rev" property="build.last_rev" />
+        <info target="${SVN_stage_branch}/${SVN_Build_Target}"  propPrefix="build.svn.info." />
+    </svn>
+    	
+    <!-- do not reinstall OSAL if the last build revision recorded (svn property) is the same as the current revision but force
+         a rebuild if CCES kit has changed -->
+    <condition property="install_osal.skip">
+        <and>
+            <equals arg1="${build.last_rev}" arg2="${build.svn.info.lastRev}" />
+            <uptodate srcfile="${PackagesDir}\cces_installation.timestamp" targetfile="${OSAL_BuildStatusDir}\osal_installation.timestamp" />
+        </and>
+    </condition>
+
+  </target>
+
+
+<!--
+================================================
+    Target: install_osal.check_manifest
+================================================
+-->
+  <!-- Desc: Verifies that the Stage files matches the Manifest -->
+
+  <target name="install_osal.check_manifest"
+          depends="install_osal.check_manifest.check"
+          unless="install_osal.skip">
+
+    <sequential>
+
+    <!-- creating the output folders if they don't already exist -->
+    <mkdir dir="${OSAL_BuildResultDir}" />
+    <mkdir dir="${OSAL_BuildStatusDir}" />
+
+    <echo message="Build need to run: changes have been detected [latest build = ${build.last_rev}, latest rev = ${build.svn.info.lastRev}]" />
+
+    <!-- generate a text file with the differences since the last build -->
+
+    <echo file="${OSAL_BuildResultDir}\svn_changes.log" message="==OSAL - The following files were changed==${line.separator}''SVN Commit ${build.svn.info.lastRev}'' ${line.separator}${line.separator}" />
+    <!-- For now this operation uses the SVN through the command-line because the command 'svn diff \-\-summarize' is not supported by the
+         svnant plugin an alternative is to output the full diff using the following command
+    <svn>
+        <diff oldUrl="${SVN_stage_branch}/${SVN_Build_Target}" oldTargetRevision="${build.last_rev}" newUrl="${SVN_stage_branch}/${SVN_Build_Target}" newTargetRevision="${build.svn.info.lastRev}" outfile="${OSAL_BuildResultDir}/svn_changes.log" />
+    </svn>
+    -->
+    <exec executable="${SvnExe}" output="${OSAL_BuildResultDir}/svn_changes.log" append="true">
+      <arg value="diff"/>
+      <arg value="--summarize"/>
+      <arg value="--non-interactive"/>
+      <arg value="--username"/>
+      <arg value="${svn.username}"/>
+      <arg value="--password"/>
+      <arg value="${svn.password}"/>
+      <arg value="--trust-server-cert"/>
+      <arg value="--no-auth-cache"/>
+      <arg value="-r${build.last_rev}:${build.svn.info.lastRev}"/>
+      <arg value="${SVN_SourcesLocation}"/>
+    </exec>
+
+<echo file="${OSAL_BuildResultDir}\svn_changes.log" append="true">
+Link to the complete detailed list of the changes:
+    [${SVN_SourcesLocation}?Insurrection=diff&amp;r=${build.svn.info.lastRev}&amp;r2=${build.svn.info.lastRev}&amp;r1=${build.last_rev} Difference between svn revisions ${build.last_rev} and ${build.svn.info.lastRev}]
+</echo>
+
+    <a:if name="svn.username" value="AutoBuild">
+        <echo level="warning">
+        
+        WARNING: The SVN username 'AutoBuild' works properly, but is very slow. The build is MUCH faster if a real NT user credentials are used. 
+        To make it run faster, replace the svn.username and svn.password properties with your own credentials in the config file. DO NOT commit the change.
+        
+        </echo>
+    </a:if>
+
+       
+    <!-- 
+         because some projects uses svn:externals, the 'svn list' command cannot be used to get the list of staged files, 
+         so this build needs to checkout all files and do the real StageVsManifest from there.
+         In order to reduce checkout time, the update operation is used and is preceeded by a Revert to clean any potential 
+         local changes.
+    -->
+    <available file="${OSAL_StageDir}" property="osal_sources.staged"/>
+    <a:if name="osal_sources.staged" exists="false">
+        <!-- some of the projects use svn:externals on files. Which is only really supported since
+             svn 1.6.7 (there was a bug before). Unfortunately SVNANT is not yet uptodate with that 
+             version of SVN, so we use the command-line right now instead of <svn>
+        -->
+        <echo>Checking out OSAL Stage files</echo>
+              <exec executable="${SvnExe}">
+                <arg value="checkout"/>
+                <arg value="--non-interactive"/>
+                <arg value="--username"/>
+                <arg value="${svn.username}"/>
+                <arg value="--password"/>
+                <arg value="${svn.password}"/>
+                <arg value="--trust-server-cert"/>
+                <arg value="--no-auth-cache"/>
+                <arg value="-r${build.svn.info.lastRev}"/>
+                <arg value="${SVN_SourcesLocation}"/>
+                <arg value="${OSAL_StageDir}" />
+              </exec>
+        <else>
+          <echo>Updating OSAL Stage files</echo>
+          <svn username="${svn.username}" password="${svn.password}">
+            <revert dir="${OSAL_StageDir}" recurse="true" />
+            <update dir="${OSAL_StageDir}" />
+          </svn>
+        </else>
+    </a:if>
+
+	<!--
+    <delete file="${SSL_BuildStatusDir}/manifest.xml" quiet="true"/>
+    <svn username="${svn.username}" password="${svn.password}">
+        <export srcUrl="${SVN_stage_branch}/${SVN_Build_Target}/manifest.xml" destPath="${SSL_BuildStatusDir}/manifest.xml" revision="${build.svn.info.lastRev}" />
+    </svn>
+    
+    <exec executable="${pythonExe}" outputproperty="stage.vs.manifest" resultproperty="stage.vs.manifest.status">
+      <arg value="${StageVsManifestScript}"/>
+      <arg value="-m"/>
+      <arg value="${SSL_BuildStatusDir}/manifest.xml"/>
+      <arg value="-f"/>
+      <arg value="${SSL_StageDir}"/>
+      <arg value="-r"/>
+      <arg value="${SVN_SourcesLocation}"/>
+    </exec>
+    <echo file="${SSL_BuildStatusDir}/stage_vs_manifest_result.log" message="${stage.vs.manifest}"/>
+    <echo message="${stage.vs.manifest}" level="info" />
+    -->
+
+    <!-- send an email with a summary of the changes -->
+
+    <echo file="${OSAL_BuildResultDir}\svn_changes.log" append="true">
+
+==Stage vs. Manifest result==
+${stage.vs.manifest}
+</echo>
+
+    <exec executable="${pythonExe}" >
+      <arg value="${SendMailScript}"/>
+      <arg value="--to"/>
+      <arg value="${OSAL_BuildMailList}"/>
+      <arg value="--from"/>
+      <arg value="${OSAL_BuildEmailAddress}"/>
+      <arg value="-s"/>
+      <arg value="OSAL Library - Build Started for commit rev ${build.svn.info.lastRev}..."/>
+      <arg value="-m"/>
+      <arg value="${OSAL_BuildResultDir}\svn_changes.log"/>
+    </exec>
+
+    <!--	
+    <fail>
+      <condition>
+        <isfailure code="${stage.vs.manifest.status}"/>
+      </condition>
+    </fail>
+	-->
+	
+<!--   
+   <loadfile property="ssl.export.lastrev" srcFile="${SSL_BuildStatusDir}\svn_ssl_export_status.dat" failonerror="false"/>
+   <condition property="install_ssl.skip">
+       <contains string="${ssl.export.lastrev}" substring="${build.svn.info.lastRev}"/>
+   </condition>
+-->
+
+    </sequential>
+  </target>
+
+
+<!--
+================================================
+    Target: install_osal
+================================================
+-->
+  <target name="install_osal"
+          description="Checks out the OSAL source files and copies them into the BaseKit location."
+          depends="install_osal.check_manifest"
+          unless="install_osal.skip">
+
+    <!-- Export the sources to a temporary folder because the export function does not support overwriting files -->
+    <delete dir="${OSAL_TempCheckoutDir}" quiet="true"/>
+    <a:if name="osal.checkout.dir">
+        <svn username="${svn.username}" password="${svn.password}">
+          <export srcPath="${osal.checkout.dir}" destPath="${OSAL_TempCheckoutDir}" revision="${build.svn.info.lastRev}" />
+        </svn>
+        <else>
+            <svn username="${svn.username}" password="${svn.password}">
+              <export srcUrl="${SVN_SourcesLocation}" destPath="${OSAL_TempCheckoutDir}" revision="${build.svn.info.lastRev}" />
+            </svn>
+        </else>
+    </a:if>
+
+
+    <!-- copy the checked out files directly into the install folder -->
+    <!--
+    <copy todir="${BaseKitInstallDir}" overwrite="true">
+        <fileset dir="${SSL_TempCheckoutDir}">
+           <exclude name="**/manifest.xml"/>
+        </fileset>
+    </copy>
+    -->
+	
+    <echo file="${OSAL_BuildStatusDir}\svn_osal_export_status.dat" message="${build.svn.info.lastRev}" />
+
+    <touch file="${OSAL_BuildStatusDir}\osal_installation.timestamp"/>
+
+  </target>
+
+
+
+
+<!--#####################################################################################################################-->
+<!--                                  OSAL Build related targets                                                          -->
+
+
+<!--
+================================================
+    Target: build.check
+================================================
+-->
+  <!-- Desc: Builds the OSAL libraries -->
+
+  <target name="build.check"
+          depends="install_osal"
+          unless="forcebuild">
+
+    <!-- if OSAL sources have changed , let rebuild -->
+    <!-- if last build wasn't successful it will also rebuild -->
+    <uptodate srcfile="${OSAL_BuildStatusDir}\osal_installation.timestamp" targetfile="${OSAL_BuildStatusDir}\osal_build.timestamp"
+              property="build.skip"/>
+
+    <a:if name="build.skip">
+        <echo>
+
+OSAL does not need to be rebuilt, it has already been successfully built for revision ${build.svn.info.lastRev}
+
+To force a rebuild pass the 'forcebuild' property to ant by calling it this way:
+
+ant -f Ant_OSAL_Build_SVN.xml build -Dforcebuild=1
+        </echo>
+    </a:if>
+
+
+  </target>
+
+
+
+<!--
+================================================
+    Target: build
+================================================
+-->
+  <target name="build"
+          description="Builds the OSAL libraries"
+          depends="clean_all, install_osal"
+          unless="build.skip">
+
+    <sequential>
+
+        <echo>Starting to Build OSAL no-OS projects</echo>
+
+        <!-- Build Blackfin OSAL noos -->
+        <echo file="${OSAL_BuildResultDir}\Blackfin_osal_noos.log"  message="===== BUILDING Blackfin OSAL NOOS LIBRARIES ====="/>
+
+        <exec executable="${pythonExe}" output="${OSAL_BuildResultDir}\Blackfin_osal_noos.log" outputproperty="osal.noos.build.output.blackfin" resultproperty="OsalNoos_Build_Result" append="true" failonerror="true">
+          <arg value="${OSALLibBuildScript}"/>
+          <arg value='-v' />
+          <arg value='-k' />
+          <arg value='${build.rebuild_arg}' />
+          <arg value='-p' />
+          <arg value="${dlbOsalNoosBlackfin}"/>
+          <arg value='--filter-in-regexp' />
+          <arg value='libosal' />
+		  <arg value='--headless-build-exe-path' />
+          <arg value="${BaseKitInstallDir}\Eclipse\ccesc.exe"/>
+        </exec>
+
+        <!-- stop the process if any failures are found -->
+        <fail message="The build script returned an error">
+          <condition>
+              <contains string="${osal.noos.build.output.blackfin}" substring="***build failure:"/>
+          </condition>
+        </fail>
+
+        <echo file="${OSAL_BuildResultDir}\Blackfin_osal_noos.log"  message="Built based on SVN revision ${build.svn.info.lastRev}" append="true"/>
+
+        <!-- Build Sharc OSAL noos -->
+
+        <echo file="${OSAL_BuildResultDir}\Sharc_osal_noos.log"  message="===== BUILDING Sharc OSAL NOOS LIBRARIES ====="/>
+
+        <exec executable="${pythonExe}" output="${OSAL_BuildResultDir}\Sharc_osal_noos.log" outputproperty="osal.noos.build.output.sharc" resultproperty="OsalNoos_Build_Result" append="true" failonerror="true">
+          <arg value="${OSALLibBuildScript}"/>
+          <arg value='-v' />
+          <arg value='-k' />
+          <arg value='${build.rebuild_arg}' />
+          <arg value='-p' />
+          <arg value="${dlbOsalNoosSharc}"/>
+          <arg value='--filter-in-regexp' />
+          <arg value='libosal' />
+		  <arg value='--headless-build-exe-path' />
+          <arg value="${BaseKitInstallDir}\Eclipse\ccesc.exe"/>
+        </exec>
+
+        <!-- stop the process if any failures are found -->
+        <fail message="The build script returned an error">
+          <condition>
+              <contains string="${osal.noos.build.output.sharc}" substring="***build failure:"/>
+          </condition>
+        </fail>
+        
+        <echo file="${OSAL_BuildResultDir}\Sharc_osal_noos.log"  message="Built based on SVN revision ${build.svn.info.lastRev}" append="true"/>
+
+       <!-- Build ARM OSAL noos -->
+        <echo file="${OSAL_BuildResultDir}\arm_osal_noos.log"  message="===== BUILDING ARM OSAL NOOS LIBRARIES ====="/>
+
+        <exec executable="${pythonExe}" output="${OSAL_BuildResultDir}\arm_osal_noos.log" outputproperty="osal.noos.build.output.arm" resultproperty="OsalNoos_Build_Result" append="true" failonerror="true">
+          <arg value="${OSALLibBuildScript}"/>
+          <arg value='-v' />
+          <arg value='-k' />
+          <arg value='${build.rebuild_arg}' />
+          <arg value='-p' />
+          <arg value="${dlbOsalNoosArm}"/>
+          <arg value='--filter-in-regexp' />
+          <arg value='libosal' />
+		  <arg value='--headless-build-exe-path' />
+          <arg value="${BaseKitInstallDir}\Eclipse\ccesc.exe"/>
+        </exec>
+
+        <!-- stop the process if any failures are found -->
+        <fail message="The build script returned an error">
+          <condition>
+              <contains string="${osal.noos.build.output.arm}" substring="***build failure:"/>
+          </condition>
+        </fail>
+        
+        <echo file="${OSAL_BuildResultDir}\arm_osal_noos.log"  message="Built based on SVN revision ${build.svn.info.lastRev}" append="true"/>
+
+    </sequential>
+
+    <touch file="${OSAL_BuildStatusDir}\osal_build.timestamp"/>
+
+
+  </target>
+
+
+
+<!--#####################################################################################################################-->
+<!--                                  OSAL Test related targets                                                          -->
+
+<!--
+================================================
+    Target: test.check
+================================================
+-->
+   <!-- verifies if the test need to be run -->
+   <target name="test.check" >
+        <!-- if OSAL libraries have changed , let's retest -->
+        <uptodate srcfile="${OSAL_BuildStatusDir}\osal_build.timestamp" targetfile="${OSAL_BuildStatusDir}\osal_test.timestamp"
+                  property="test.skip"/>
+
+   </target>
+
+<!--
+================================================
+    Target: test.relocate
+================================================
+-->
+  <!-- Desc: Copies the built libraries to their proper place within the CCES installation -->
+  <target name="test.relocate"
+          depends="test.check"
+          unless="test.skip">
+
+    <!-- copy the built DLBs into the lib folder -->
+    <copy todir="${dlbRelocDstBlackfin}" overwrite="true">
+        <fileset dir="${dlbOsalNoosBlackfin}\build\">
+            <include name="**/*.dlb"/>
+        </fileset>
+    </copy>
+
+  </target>
+
+
+<!--
+================================================
+    Target: test
+================================================
+-->
+  <target name="test"
+          description="Tests the build by rebuilding the examples with the newly created libraries"
+          depends="test.relocate, test.check"
+          unless="test.skip">
+
+    <exec executable="${pythonExe}" failonerror="true" outputproperty="osal.test.output" >
+      <arg value="${testBuildScript}"/>
+      <arg value="-m"/>
+      <arg value="${OSAL_BuildStatusDir}\manifest.xml"/>
+      <arg value="-o"/>
+      <arg value="${OSAL_BuildResultDir}\tests.log"/>
+      <arg value="-v"/>
+      <arg value="-k"/>
+      <arg value='${build.rebuild_arg}' />      
+      <arg value="-p"/>
+      <arg value='"${BaseKitInstallDir}"'/>
+    </exec>
+
+    <!-- stop process if build failures are detected -->
+    <fail>
+      <condition>
+        <contains string="${osal.test.output}" substring="***build failure:"/>
+      </condition>
+    </fail>
+
+    <touch file="${OSAL_BuildStatusDir}\osal_test.timestamp" />
+
+  </target>
+
+
+
+
+
+
+<!--#####################################################################################################################-->
+<!--                                  OSAL Package related targets                                                          -->
+
+
+<!--
+================================================
+    Target: package.check
+================================================
+-->
+  <target name="package.check">
+        <!-- if OSAL libraries have changed , let's repackage -->
+        <uptodate srcfile="${OSAL_BuildStatusDir}\osal_build.timestamp" targetfile="${OSAL_BuildStatusDir}\osal_package.timestamp"
+                  property="package.skip"/>
+  </target>
+
+<!--
+================================================
+    Target: package
+================================================
+-->
+  <target name="package"
+          description="Copies the built libraries to the checkout area and generate a zip file"
+          depends="package.check"
+          unless="package.skip">
+
+    <!-- copy the built DLBs and source files into the stage folder -->
+	<copy todir="${OSAL_PackageDir}\Blackfin\lib\" overwrite="true">
+		<fileset dir="${dlbOsalNoosBlackfin}\Build">
+			<include name="**/*.dlb"/>
+		</fileset>
+	</copy>
+	<copy todir="${OSAL_PackageDir}\SHARC\lib\" overwrite="true">
+		<fileset dir="${dlbOsalNoosSharc}\Build">
+			<include name="**/*.dlb"/>
+		</fileset>
+	</copy>
+	<copy todir="${OSAL_PackageDir}\ARM\arm-none-eabi\arm-none-eabi\lib\" overwrite="true">
+		<fileset dir="${dlbOsalNoosArm}\Build">
+			<include name="**/*.a"/>
+		</fileset>
+	</copy>
+	
+	<copy file="${OSAL_TempCheckoutDir}\noos\osal\Source\adi_osal.h" todir="${OSAL_PackageDir}\Blackfin\include" overwrite="true"/>
+	<copy file="${OSAL_TempCheckoutDir}\noos\osal\Source\adi_osal.h" todir="${OSAL_PackageDir}\SHARC\include" overwrite="true"/>
+	<copy file="${OSAL_TempCheckoutDir}\noos\osal\Source\adi_osal.h" todir="${OSAL_PackageDir}\ARM\arm-none-eabi\arm-none-eabi\include\adi\cortex-a5" overwrite="true"/>
+
+	<copy file="${OSAL_TempCheckoutDir}\noos\osal\Ports\Blackfin\CCES\adi_osal_arch.h" todir="${OSAL_PackageDir}\Blackfin\include" overwrite="true"/>
+	<copy file="${OSAL_TempCheckoutDir}\noos\osal\Ports\SHARC\CCES\adi_osal_arch.h" todir="${OSAL_PackageDir}\SHARC\include" overwrite="true"/>
+	<copy file="${OSAL_TempCheckoutDir}\noos\osal\Ports\ARM-Cortex-A5\CCES\adi_osal_arch.h" todir="${OSAL_PackageDir}\ARM\arm-none-eabi\arm-none-eabi\include\adi\cortex-a5" overwrite="true"/>
+
+	<copy todir="${OSAL_PackageDir}\Blackfin\lib\src\osal_noos\Source" overwrite="true">
+		<fileset dir="${OSAL_TempCheckoutDir}\noos\osal\Source">
+			<exclude name="adi_osal.h"/>
+			<include name="**/*.c"/>
+			<include name="**/*.h"/>
+		</fileset>
+	</copy>
+
+	<copy todir="${OSAL_PackageDir}\SHARC\lib\src\osal_noos\Source" overwrite="true">
+		<fileset dir="${OSAL_TempCheckoutDir}\noos\osal\Source">
+			<exclude name="adi_osal.h"/>
+			<include name="**/*.c"/>
+			<include name="**/*.h"/>
+		</fileset>
+	</copy>
+
+   	<copy todir="${OSAL_PackageDir}\ARM\arm-none-eabi\arm-none-eabi\lib\src\cortex-a5\osal_noos\Source" overwrite="true">
+		<fileset dir="${OSAL_TempCheckoutDir}\noos\osal\Source">
+			<exclude name="adi_osal.h"/>
+			<include name="**/*.c"/>
+			<include name="**/*.h"/>
+		</fileset>
+	</copy>
+
+	<copy todir="${OSAL_PackageDir}\Blackfin\lib\src\osal_noos\Ports\Blackfin\CCES" overwrite="true">
+		<fileset dir="${OSAL_TempCheckoutDir}\noos\osal\Ports\Blackfin\CCES"/>
+	</copy>
+	
+	<copy todir="${OSAL_PackageDir}\SHARC\lib\src\osal_noos\Ports\SHARC\CCES" overwrite="true">
+		<fileset dir="${OSAL_TempCheckoutDir}\noos\osal\Ports\SHARC\CCES"/>
+	</copy>
+
+	<copy todir="${OSAL_PackageDir}\ARM\arm-none-eabi\arm-none-eabi\lib\src\cortex-a5\osal_noos\Ports\ARM-Cortex-A5\CCES" overwrite="true">
+		<fileset dir="${OSAL_TempCheckoutDir}\noos\osal\Ports\ARM-Cortex-A5\CCES"/>
+	</copy>
+
+	<copy todir="${OSAL_PackageDir}\Blackfin\lib\src\osal_noos\Projects\Blackfin\CCES" overwrite="true">
+		<fileset dir="${OSAL_TempCheckoutDir}\noos\osal\Projects\Blackfin\CCES">
+			<include name="libosal*"/>
+			<include name="**/.project"/>
+			<include name="**/.cproject"/>
+			<exclude name="Build"/>
+			<exclude name="**/Debug"/>
+			<exclude name="**/Release"/>
+		</fileset>
+	</copy>
+	
+	<copy todir="${OSAL_PackageDir}\SHARC\lib\src\osal_noos\Projects\SHARC\CCES" overwrite="true">
+		<fileset dir="${OSAL_TempCheckoutDir}\noos\osal\Projects\SHARC\CCES">
+			<include name="libosal*"/>
+			<include name="**/.project"/>
+			<include name="**/.cproject"/>
+			<exclude name="Build"/>
+			<exclude name="**/Debug"/>
+			<exclude name="**/Release"/>
+		</fileset>
+	</copy>
+
+   	<copy todir="${OSAL_PackageDir}\ARM\arm-none-eabi\arm-none-eabi\lib\src\cortex-a5\osal_noos\Projects\ARM\CCES" overwrite="true">
+		<fileset dir="${OSAL_TempCheckoutDir}\noos\osal\Projects\ARM-Cortex-A5\CCES">
+			<include name="libosal*"/>
+			<include name="**/.project"/>
+			<include name="**/.cproject"/>
+			<exclude name="Build"/>
+			<exclude name="**/Debug"/>
+			<exclude name="**/Release"/>
+		</fileset>
+	</copy>
+
+    <loadfile srcfile="${OSAL_BuildStatusDir}\svn_osal_export_status.dat" property="osal.source.rev.string"/>
+
+    <!-- create the ZIP package -->
+
+    <!-- exclude the files that are marked as internal and excluded -->
+    <exec executable="${pythonExe}" output="${OSAL_BuildStatusDir}\list_internal_files.txt" failonerror="true">
+        <arg value="${ParseManifestScript}"/>
+        <arg value="-m" />
+        <arg value="${OSAL_BuildStatusDir}\manifest.xml" />
+        <arg value="-i" />
+        <arg value="-x" />
+    <arg value="--ant" />
+    </exec>
+
+    <delete>
+        <!-- remove old artifacts -->
+        <fileset dir="${OSAL_BuildResultDir}" includes="osal_libraries_svn_*.zip"/>
+    </delete>
+
+    <zip destfile="${OSAL_BuildResultDir}\osal_libraries_svn_${osal.source.rev.string}.zip"
+         basedir="${OSAL_PackageDir}"
+         excludes="manifest.xml"
+         excludesfile="${OSAL_BuildStatusDir}\list_internal_files.txt"
+    />
+
+    <touch file="${OSAL_BuildStatusDir}\osal_package.timestamp" />
+
+  </target>
+
+<!--
+================================================
+    Target: report.check
+================================================
+-->
+  <target name="report.check">
+        <!-- if OSAL libraries have been repackage, then let's rerun the reporting tool -->
+        <uptodate srcfile="${OSAL_BuildStatusDir}\osal_package.timestamp" targetfile="${OSAL_BuildStatusDir}\osal_report.timestamp"
+                  property="report.skip"/>
+        <echo message="Build version is ${env.BUILD_VERSION}" />
+  </target>
+
+
+<!--
+================================================
+    Target: report_results
+================================================
+-->
+  <target name="report_results"
+          description="reports the results on the screen and by email"
+          depends="report.check"
+          unless="report.skip">
+
+    <echo message="Build complete!"/>
+
+    <sequential>
+
+
+    <exec executable="${pythonExe}" outputproperty="build.tools.versions" >
+      <arg value="${getToolsVersionScript}"/>
+      <arg value='-v' />
+      <arg value='-p' />
+      <arg value='"${BaseKitInstallDir}"' />
+    </exec>
+
+<!-- extract the result lines (result code + text) -->
+    <loadfile srcfile="${OSAL_BuildStatusDir}\stage_vs_manifest_result.log" property="osal.manifest.check.string"/>
+    <loadfile srcfile="${OSAL_BuildStatusDir}\svn_osal_export_status.dat" property="osal.source.rev.string"/>
+
+    <loadfile srcfile="${OSAL_BuildResultDir}\build.log" property="osal.build.result.string">
+      <filterchain>
+        <linecontainsregexp>
+          <regexp pattern="(\[PASS\]|\[FAIL\])"/>
+        </linecontainsregexp>
+      </filterchain>
+    </loadfile>
+    <condition property="osal.build.result.string" value="[FAIL]">
+        <not>
+            <isset property="osal.build.result.string" />
+        </not>
+    </condition>
+
+    <loadfile srcfile="${OSAL_BuildResultDir}\tests.log" property="osal.test.result.string">
+      <filterchain>
+        <linecontainsregexp>
+          <regexp pattern="(\[PASS\]|\[FAIL\])"/>
+        </linecontainsregexp>
+      </filterchain>
+    </loadfile>
+    <condition property="osal.test.result.string" value="[FAIL]">
+        <not>
+            <isset property="osal.test.result.string" />
+        </not>
+    </condition>
+
+<!-- save the date/time of the build -->
+    <tstamp>
+        <format property="build.time" pattern="MM/dd/yyyy hh:mm aa" locale="en,US"/>
+    </tstamp>
+
+<!-- extract only the result code from the result lines -->
+    <condition property="build.result.manifest" value="[PASS]" else="[FAIL]">
+        <contains string="${osal.manifest.check.string}" substring="[PASS]"/>
+    </condition>
+    <condition property="build.result.build" value="[PASS]" else="[FAIL]">
+        <contains string="${osal.build.result.string}" substring="[PASS]"/>
+    </condition>
+    <condition property="build.result.tests" value="[PASS]" else="[FAIL]">
+        <contains string="${osal.test.result.string}" substring="[PASS]"/>
+    </condition>
+
+<!-- if all stages have PASSed, then the build has PASSed -->
+    <condition property="build.result.all" value="[PASS]" else="[FAIL]">
+        <and>
+            <equals arg1="${build.result.manifest}" arg2="[PASS]"/>
+            <equals arg1="${build.result.build}" arg2="[PASS]"/>
+            <equals arg1="${build.result.tests}" arg2="[PASS]"/>
+        </and>
+    </condition>
+
+<!-- get output folder -->
+    <condition property="build.output.location.string" value="copied to ${build.out.folder}" else="kept locally in ${tempDir}">
+        <isset property="build.out.folder" />
+    </condition>
+    <condition property="build.output.location" value="${build.out.folder}" else="${tempDir}">
+        <isset property="build.out.folder" />
+    </condition>
+
+
+<!-- Generate output file -->
+    <echo file="${OSAL_Build_Output}">
+==OSAL - Build Output Log ${build.result.all} ==
+
+''Build time:  ${build.time}''
+
+''Sources from SVN revision ${osal.source.rev.string}''
+
+=== Tools versions ===
+${build.tools.versions}
+
+=== Manifest Check - ${build.result.manifest} ===
+        ${osal.manifest.check.string}
+
+=== Build results - ${build.result.build} ===
+        ${osal.build.result.string}
+        See 'builds_results\build.log' for details
+
+=== Tests results - ${build.result.tests} ===
+        ${osal.test.result.string}
+        See 'builds_results\tests.log' for details
+
+'''''Build output is ${build.output.location.string}'''''
+
+    </echo>
+
+<!-- generate the complete output log -->
+    <concat destfile="${OSAL_BuildResultDir}\full_output.log" append="yes">
+      <filelist dir="${OSAL_BuildResultDir}" files="svn_changes.log,build.log,tests.log" />
+    </concat>
+
+
+<!-- update the SVN property and buildlog -->
+    <delete dir="${tempDir}\temp_proj_root" />
+    <!-- increment revision number to compensate for committing it (it will increment the repository number -->
+    <a:math result="new_rev_num" operand1="${osal.source.rev.string}" operation="+" operand2="1" datatype="int"/>
+    <svn username="${svn.username}" password="${svn.password}" failonerror="false">
+        <info target="${SVN_stage_branch}/${SVN_Build_Target}"  propPrefix="build.svn.info." />
+    </svn>
+
+    <echo>Current rev = ${build.svn.info.lastRev}
+        New rev = ${new_rev_num}
+    </echo>
+
+    <!-- only increment the SVN revision number and update buildlog.xml if it is not yet up to date -->
+    <a:if>
+      <bool>
+        <islessthan arg1="${build.svn.info.lastRev}" arg2="${new_rev_num}" />
+      </bool>
+
+      <svn username="${svn.username}" password="${svn.password}">
+        <checkout url="${SVN_stage_branch}/${SVN_Build_Target}" recurse="false" destPath="${tempDir}\temp_proj_root" revision="${osal.source.rev.string}" />
+        <propset path="${tempDir}\temp_proj_root" name="build:last_rev" value="${new_rev_num}" />
+      </svn>
+
+      <!-- update buildlog.xml -->
+        <tempfile property="buildlog.tempfile"/>
+        <echoxml file="${buildlog.tempfile}">
+            <build rev="${osal.source.rev.string}">
+                <date value="${build.time}" />
+                <output_folder value="${build.output.location}" />
+                <manifestcheck result="${build.result.manifest}" />
+                <build result="${build.result.build}" />
+                <tests result="${build.result.tests}" />
+            </build>
+        </echoxml>
+
+        <loadfile srcfile="${buildlog.tempfile}" property="buildlog.addition"/>
+        <a:if>
+            <bool>
+                <available file="${tempDir}\temp_proj_root\buildlog.xml"/>
+            </bool>
+            <!-- insert the XML block just before the last line -->
+            <replace file="${tempDir}\temp_proj_root\buildlog.xml" token="/project" value="${buildlog.addition}" />
+            <else>
+               <!-- generate a new file -->
+               <tempfile property="buildlog.header"/>
+               <concat destfile="${tempDir}\temp_proj_root\buildlog.xml">
+                    <header filtering="no" trimleading="yes">
+                        test
+                    </header>
+                    <filelist dir="notes" files="${buildlog.tempfile}"/>
+               </concat>
+               <delete file="${buildlog.header}"/>
+            </else>
+        </a:if>
+        <delete file="${buildlog.tempfile}"/>
+
+
+        <!-- submit the changes (svn folder property + addition to the logfile) -->
+        <svn username="${svn.username}" password="${svn.password}">
+            <update dir="${tempDir}\temp_proj_root" />
+        </svn>
+
+        <exec executable="${SvnExe}" dir="${tempDir}\temp_proj_root">
+          <arg value="commit"/>
+          <arg value="--non-interactive"/>
+          <arg value="-m"/>
+          <arg value="AutoBuild: update build:last_rev property and buildlog info ${build.result.all}"/>
+          <arg value="--depth"/>
+          <arg value="immediates"/>
+          <arg value="--username"/>
+          <arg value="${svn.username}"/>
+          <arg value="--password"/>
+          <arg value="${svn.password}"/>
+          <arg value="--trust-server-cert"/>
+          <arg value="--no-auth-cache"/>
+        </exec>
+
+        <!-- delete temporary files -->
+        <delete dir="${tempDir}\temp_proj_root" />
+
+    </a:if>
+
+
+<!-- Send result by eMail -->
+    <exec executable="${pythonExe}" >
+      <arg value="${SendMailScript}"/>
+      <arg value="--to"/>
+      <arg value="${OSAL_BuildMailList}"/>
+      <arg value="--from"/>
+      <arg value="${OSAL_BuildEmailAddress}"/>
+      <arg value="-s"/>
+      <arg value="OSAL Library - Finished Build - Log for commit rev ${osal.source.rev.string} : ${build.result.all}"/>
+      <arg value="-m"/>
+      <arg value="${OSAL_Build_Output}"/>
+    </exec>
+
+<!-- Copy directory in the output folder if it exists -->
+    <a:if name="build.out.folder" exists="true">
+        <echo message="creating ${build.out.folder} output folder" />
+        <mkdir dir="${build.out.folder}" />
+        <move todir="${build.out.folder}" overwrite="true" verbose="true">
+            <fileset dir="${OSAL_BuildResultDir}"/>
+        </move>
+        <else>
+            <echo> Package is located in the folder : ${OSAL_BuildResultDir} </echo>
+        </else>
+    </a:if>
+
+    <touch file="${OSAL_BuildStatusDir}\osal_report.timestamp"/>
+  </sequential>
+
+
+  </target>
+
+
+<!--
+================================================
+    Target: stage_sqe
+================================================
+-->
+  <target name="stage_sqe"
+          description="Stage the file to the SQE repository"
+          depends="package,report_results">
+  
+  
+    
+  
+    <echo>
+        Staging to the SQE repository
+    </echo>
+  
+    <echo  message="Checking out the SQE repository, this may take a long time..." level="warning" />
+    <a:if>
+        <bool>
+            <available file="${SQERepo_Checkout}\Blackfin"/>
+        </bool>
+            <svn username="${svn.username}" password="${svn.password}">
+                <update dir="${SQERepo_Checkout}\Blackfin" />
+            </svn>
+        <else>
+            <svn username="${svn.username}" password="${svn.password}">
+                <checkout url="${SQE_Stage_SVN_URL}" recurse="true" destPath="${SQERepo_Checkout}\Blackfin" />
+            </svn>
+        </else>
+    </a:if>
+
+    <!-- Copy the changes -->
+    <unzip src="${OSAL_BuildResultDir}\osal_libraries_svn_${osal.source.rev.string}.zip"
+         dest="${SQERepo_Checkout}"
+    />
+    
+    <!-- Verify the changes against the SVN changes -->
+        <!-- get the list of changes -->
+        <svn username="${svn.username}" password="${svn.password}">
+            <status path="${SQERepo_Checkout}\Blackfin" textStatusProperty="check_diff_stage.textStat"/>
+        </svn>
+
+    <echo>
+        STATUS: 
+        ${check_diff_stage.textStat}
+    </echo>
+        
+    
+    <!-- Update the manifest -->
+    
+    <!-- Commit the files -->
+
+    <!-- Send an email with the results -->
+  
+  </target>
+
+
+
+
+<!--
+================================================
+    Target: config
+================================================
+-->
+  <target name="config"
+          description="Prints the content of the configuration">
+
+    <echo>
+        Tools Product name  =    ${baseProductName}
+        Kits Update Folder  =    ${kitsDirectory}
+        KitName             =    ${kitName}
+        Base Kit Folder     =    ${BaseGoldMasterDirectory}
+        Base GM Kit name    =    ${BaseGoldMasterKitName}
+        Registry Key        =    ${AnalogRegistryKey}
+        License file        =    ${LicenseFile}
+        SVN stage branch    =    ${SVN_stage_branch}
+        SVN Build Target    =    ${SVN_Build_Target}
+        SVN Sources path    =    ${SVN_SourcesLocation}
+        SVN Scripts path    =    ${SVN_ScriptsLocation}
+        BaseKitInstallDir   =    ${BaseKitInstallDir}
+        ModuleRootFolder    =    ${targetModuleRootFolder}
+        dlbOsalNoosBlackfin =    ${dlbOsalNoosBlackfin}
+        dlbRelocDstBlackfin =    ${dlbRelocDstBlackfin}
+        dlbOsalNoosSharc    =    ${dlbOsalNoosSharc}
+        dlbRelocDstSharc    =    ${dlbRelocDstSharc}
+        dlbOsalNoosArm      =    ${dlbOsalNoosArm}
+        dlbRelocDstArm      =    ${dlbRelocDstArm}
+        svn username        =    ${svn.username}
+    </echo>
+
+  </target>
+
+
+</project>

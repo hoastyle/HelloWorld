@@ -1,0 +1,215 @@
+10
+
+dir
+32427
+https://dspeng.spd.analog.com/svn/swe/rtos/trunk/noos/osal/Projects/SHARC/CCES
+https://dspeng.spd.analog.com/svn/swe
+
+
+
+2015-06-09T14:38:16.625670Z
+31348
+sfernan
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+faaaf02c-4cd7-11db-87e5-fa36deddc86e
+
+osal_projects.cfg
+file
+
+
+
+
+2015-10-16T02:52:55.036834Z
+edde731a45349e92430ce73c4039eff2
+2015-06-09T14:38:16.625670Z
+31348
+sfernan
+has-props
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+1621
+
+libosal469_none
+dir
+
+libosal479_none
+dir
+
+project.tmpl
+file
+
+
+
+
+2015-10-16T02:52:55.036834Z
+48ef76af8c6d3ee0d4def3c41f64bfee
+2011-09-19T14:47:49.620756Z
+11368
+sfernan
+has-props
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+5780
+
+libosal160_any
+dir
+
+libosal161_any
+dir
+
+cproject.tmpl
+file
+
+
+
+
+2015-10-16T02:52:55.036834Z
+8b9acdb9af3d8de1884c30590ef95079
+2011-09-28T11:32:33.929202Z
+11474
+sfernan
+has-props
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+55574
+
+libosal371_any
+dir
+
+libosal362_any
+dir
+
+libosalsc589_any
+dir
+
+libosal266_any
+dir
+
+generate_projects.py
+file
+
+
+
+
+2015-10-16T02:52:55.036834Z
+3f0b5a3e077b7f864938dd4a72a4d489
+2011-03-02T17:03:21.691752Z
+9847
+sfernan
+has-props
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+10203
+
+libosal367_any
+dir
+
+libosal469_any
+dir
+
+libosal371_none
+dir
+
+libosal362_none
+dir
+
+libosal479_any
+dir
+
+libosalsc589_none
+dir
+
+libosal266_none
+dir
+
+libosal367_0.1
+dir
+
+libosal367_none
+dir
+

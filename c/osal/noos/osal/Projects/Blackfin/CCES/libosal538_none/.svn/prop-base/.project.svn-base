@@ -1,0 +1,28 @@
+K 10
+configfile
+V 2
+v9
+K 13
+svn:eol-style
+V 6
+native
+K 13
+svn:mergeinfo
+V 1192
+/rtos/branches/CM408_1_0_0/noos/osal/Projects/Blackfin/CCES/libosal538_none/.project:16168-30637
+/rtos/branches/CM408_1_3_0/noos/osal/Projects/Blackfin/CCES/libosal538_none/.project:28973-30640
+/rtos/branches/cces_1_0_2/noos/osal/Projects/Blackfin/CCES/libosal538_none/.project:18142-18299
+/rtos/branches/cces_1_1_0/noos/osal/Projects/Blackfin/CCES/libosal538_none/.project:24094-26148
+/rtos/branches/cces_2.0.0/noos/osal/Projects/Blackfin/CCES/libosal538_none/.project:22111-23427
+/rtos/branches/ucos2_1_0_0/noos/osal/Projects/Blackfin/CCES/libosal538_none/.project:14396-18345
+/rtos/branches/ucos2_1_0_0_addin/noos/osal/Projects/Blackfin/CCES/libosal538_none/.project:18346-21623
+/rtos/branches/ucos2_1_1_0_addin/noos/osal/Projects/Blackfin/CCES/libosal538_none/.project:23432-26341
+/rtos/branches/ucos3_1_0_2_addin/noos/osal/Projects/Blackfin/CCES/libosal538_none/.project:17900-22102
+/rtos/branches/ucos3_1_1_0/noos/osal/Projects/Blackfin/CCES/libosal538_none/.project:24537-24538
+/rtos/branches/ucos3_1_1_0_addin/noos/osal/Projects/Blackfin/CCES/libosal538_none/.project:24539-26157
+/rtos/branches/ucos3_big_delta_rom/noos/osal/Projects/Blackfin/CCES/libosal538_none/.project:21631-24536
+K 13
+svn:mime-type
+V 8
+text/xml
+END
