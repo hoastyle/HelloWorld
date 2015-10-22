@@ -1,0 +1,1 @@
+cmd_/home/hliang/workspace/learn/linux/driver/examples/scullc/scullc.o := ld -m elf_x86_64   -r -o /home/hliang/workspace/learn/linux/driver/examples/scullc/scullc.o /home/hliang/workspace/learn/linux/driver/examples/scullc/main.o 
