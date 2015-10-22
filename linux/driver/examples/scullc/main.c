@@ -15,7 +15,7 @@
  * $Id: _main.c.in,v 1.21 2004/10/14 20:11:39 corbet Exp $
  */
 
-#include <linux/config.h>
+//#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
@@ -49,11 +49,8 @@ int scullc_trim(struct scullc_dev *dev);
 void scullc_cleanup(void);
 
 /* declare one cache pointer: use it for all devices */
-kmem_cache_t *scullc_cache;
-
-
-
-
+//kmem_cache_t *scullc_cache;
+struct kmem_cache *scullc_cache;
 
 #ifdef SCULLC_USE_PROC /* don't waste space if unused */
 /*
@@ -437,7 +434,8 @@ static int scullc_defer_op(int write, struct kiocb *iocb, char __user *buf,
 		return result; /* No memory, just complete now */
 	stuff->iocb = iocb;
 	stuff->result = result;
-	INIT_WORK(&stuff->work, scullc_do_deferred_op, stuff);
+	//INIT_WORK(&stuff->work, scullc_do_deferred_op, stuff);
+	INIT_WORK(&stuff->work, scullc_do_deferred_op);
 	schedule_delayed_work(&stuff->work, HZ/100);
 	return -EIOCBQUEUED;
 }
@@ -467,7 +465,7 @@ struct file_operations scullc_fops = {
 	.llseek =    scullc_llseek,
 	.read =	     scullc_read,
 	.write =     scullc_write,
-	.ioctl =     scullc_ioctl,
+	.unlocked_ioctl =     scullc_ioctl,
 	.open =	     scullc_open,
 	.release =   scullc_release,
 	.aio_read =  scullc_aio_read,
@@ -557,8 +555,10 @@ int scullc_init(void)
 		scullc_setup_cdev(scullc_devices + i, i);
 	}
 
+	//scullc_cache = kmem_cache_create("scullc", scullc_quantum,
+	//		0, SLAB_HWCACHE_ALIGN, NULL, NULL); /* no ctor/dtor */
 	scullc_cache = kmem_cache_create("scullc", scullc_quantum,
-			0, SLAB_HWCACHE_ALIGN, NULL, NULL); /* no ctor/dtor */
+			0, SLAB_HWCACHE_ALIGN, NULL); /* no ctor/dtor */
 	if (!scullc_cache) {
 		scullc_cleanup();
 		return -ENOMEM;
