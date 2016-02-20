@@ -37,13 +37,16 @@
 /*
  * Our parameters which can be set at load time.
  */
-
 int scull_major =   SCULL_MAJOR;
 int scull_minor =   0;
+//four devices
 int scull_nr_devs = SCULL_NR_DEVS;	/* number of bare scull devices */
+//one quantum_set, 4000 quantum
 int scull_quantum = SCULL_QUANTUM;
+//1000
 int scull_qset =    SCULL_QSET;
 
+//S_IRUGO stand for the permission of parameter node in sys
 module_param(scull_major, int, S_IRUGO);
 module_param(scull_minor, int, S_IRUGO);
 module_param(scull_nr_devs, int, S_IRUGO);
@@ -54,7 +57,6 @@ MODULE_AUTHOR("Alessandro Rubini, Jonathan Corbet");
 MODULE_LICENSE("Dual BSD/GPL");
 
 struct scull_dev *scull_devices;	/* allocated in scull_init_module */
-
 
 /*
  * Empty out the scull device; must be called with the device
@@ -224,12 +226,7 @@ static void scull_remove_proc(void)
 	remove_proc_entry("scullseq", NULL);
 }
 
-
 #endif /* SCULL_DEBUG */
-
-
-
-
 
 /*
  * Open and close
@@ -393,10 +390,9 @@ ssize_t scull_write(struct file *filp, const char __user *buf, size_t count,
 int scull_ioctl(struct inode *inode, struct file *filp,
                  unsigned int cmd, unsigned long arg)
 {
-
 	int err = 0, tmp;
 	int retval = 0;
-    
+
 	/*
 	 * extract the type and number bitfields, and don't decode
 	 * wrong cmds: return ENOTTY (inappropriate ioctl) before access_ok()
@@ -493,7 +489,7 @@ int scull_ioctl(struct inode *inode, struct file *filp,
 		scull_qset = arg;
 		return tmp;
 
-        /*
+		/*
          * The following two change the buffer size for scullpipe.
          * The scullpipe device uses this same ioctl method, just to
          * write less code. Actually, it's the same driver, isn't it?
@@ -511,15 +507,11 @@ int scull_ioctl(struct inode *inode, struct file *filp,
 		return -ENOTTY;
 	}
 	return retval;
-
 }
-
-
 
 /*
  * The "extended" operations -- only seek
  */
-
 loff_t scull_llseek(struct file *filp, loff_t off, int whence)
 {
 	struct scull_dev *dev = filp->private_data;
@@ -546,16 +538,14 @@ loff_t scull_llseek(struct file *filp, loff_t off, int whence)
 	return newpos;
 }
 
-
-
 struct file_operations scull_fops = {
-	.owner =    THIS_MODULE,
-	.llseek =   scull_llseek,
-	.read =     scull_read,
-	.write =    scull_write,
-	.unlocked_ioctl =    scull_ioctl,
-	.open =     scull_open,
-	.release =  scull_release,
+	.owner 			=	THIS_MODULE,
+	.llseek 		=   scull_llseek,
+	.read 			=	scull_read,
+	.write 			=	scull_write,
+	.unlocked_ioctl =	scull_ioctl,
+	.open 			=	scull_open,
+	.release 		=	scull_release,
 };
 
 /*
@@ -634,7 +624,7 @@ int scull_init_module(void)
 		return result;
 	}
 
-        /* 
+	/* 
 	 * allocate the devices -- we can't have them static, as the number
 	 * can be specified at load time
 	 */
@@ -645,7 +635,7 @@ int scull_init_module(void)
 	}
 	memset(scull_devices, 0, scull_nr_devs * sizeof(struct scull_dev));
 
-        /* Initialize each device. */
+	/* Initialize each device. */
 	for (i = 0; i < scull_nr_devs; i++) {
 		scull_devices[i].quantum = scull_quantum;
 		scull_devices[i].qset = scull_qset;
@@ -654,7 +644,8 @@ int scull_init_module(void)
 		scull_setup_cdev(&scull_devices[i], i);
 	}
 
-        /* At this point call the init function for any friend device */
+	/* At this point call the init function for any friend device */
+	//init pipe device
 	dev = MKDEV(scull_major, scull_minor + scull_nr_devs);
 	dev += scull_p_init(dev);
 	dev += scull_access_init(dev);
