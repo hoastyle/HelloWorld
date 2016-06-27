@@ -1,1 +1,0 @@
-cmd_/home/hao/Workspace/my_project/Learn/Linux/driver/Exercise/class.ko := ld -r -m elf_x86_64 -T ./scripts/module-common.lds --build-id  -o /home/hao/Workspace/my_project/Learn/Linux/driver/Exercise/class.ko /home/hao/Workspace/my_project/Learn/Linux/driver/Exercise/class.o /home/hao/Workspace/my_project/Learn/Linux/driver/Exercise/class.mod.o
