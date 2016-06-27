@@ -20,7 +20,7 @@ MODULE_PARM_DESC(buffer_size, "Internal buffer size");
 static int __init hello_init(void)
 {
 	printk(KERN_INFO "param1 is %d\n", param1);
-	printk(KERN_INFO "buffer_size is %d\n", buffer_size);
+	printk(KERN_INFO "buffer_size is %lu\n", buffer_size);
 	printk(KERN_INFO "Hello world\n");
 	return 0;
 }
