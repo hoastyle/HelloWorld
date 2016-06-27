@@ -11,13 +11,13 @@
 
 //parameter guide
 //sudo insmod hello_world param1=10
-int param1 = 0;
-module_param(param1, int, 0);
-
-//parameter will be found in /sys/module/hello_world/parameter
-static unsigned long buffer_size = 4196;
-module_param(buffer_size, ulong, (S_IRUSR | S_IRGRP | S_IROTH));
-MODULE_PARM_DESC(buffer_size, "Internal buffer size");
+//int param1 = 0;
+//module_param(param1, int, 0);
+//
+////parameter will be found in /sys/module/hello_world/parameter
+//static unsigned long buffer_size = 4196;
+//module_param(buffer_size, ulong, (S_IRUSR | S_IRGRP | S_IROTH));
+//MODULE_PARM_DESC(buffer_size, "Internal buffer size");
 
 static struct cdev chr_dev;
 static dev_t ndev;
@@ -30,11 +30,17 @@ static int chr_open(struct inode *nd, struct file *filp)
 	return 0;
 }
 
+static ssize_t chr_read(struct file *flip, char *buf, size_t count, loff_t *f_pos)
+{
+	printk(KERN_INFO "In the chr_read function\n");
+	return 0;
+}
+
 //owner?
 struct file_operations chr_ops = {
 	.owner = THIS_MODULE,
 	.open = chr_open,
-	//.read = chr_read,
+	.read = chr_read,
 };
 
 //__init和__exit？
@@ -52,8 +58,6 @@ static int __init hello_init(void)
 
 	printk(KERN_INFO "Hello world\n");
 	printk(KERN_INFO "major is %d, minor is %d\n", MAJOR(ndev), MINOR(ndev));
-	printk(KERN_INFO "param1 is %d\n", param1);
-	printk(KERN_INFO "buffer_size is %lu\n", buffer_size);
 	return 0;
 }
 

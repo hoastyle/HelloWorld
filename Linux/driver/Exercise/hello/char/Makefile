@@ -1,5 +1,5 @@
 #ifneq ($(KERNELRELEASE),)
-#obj-m := hello_world.o
+#obj-m := char.o
 #else
 KERNELDIR := /lib/modules/$(shell uname -r)/build
 PWD := $(shell pwd)
