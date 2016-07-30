@@ -1,9 +1,9 @@
 Driver debug message:
-[347062.729602] chr_open, major is 246, minor is 0
-[347062.729607] In the chr_read function
-[347096.596264] Bye world
-[347292.167527] Hello world
-[347292.167530] major is 246, minor is 0
+[359189.759596] chr_open, major is 246, minor is 0
+[359189.759599] In the chr_read function
+[359189.767503] Bye world
+[359233.496571] Hello world
+[359233.496574] major is 246, minor is 0
 
 lsmod info:
 Module                  Size  Used by
@@ -56,3 +56,7 @@ ahci                   36864  4
 libahci                32768  1 ahci
 e1000                 131072  0 
 pata_acpi              16384  0 
+
+char_app info:
+[359233.518324] chr_open, major is 246, minor is 0
+[359233.518327] In the chr_read function

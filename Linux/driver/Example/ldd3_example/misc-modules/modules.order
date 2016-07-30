@@ -1,0 +1,4 @@
+kernel//home/hao/Workspace/my_project/Learn/Linux/driver/Example/ldd3_example/misc-modules/hello.ko
+kernel//home/hao/Workspace/my_project/Learn/Linux/driver/Example/ldd3_example/misc-modules/hellop.ko
+kernel//home/hao/Workspace/my_project/Learn/Linux/driver/Example/ldd3_example/misc-modules/sleepy.ko
+kernel//home/hao/Workspace/my_project/Learn/Linux/driver/Example/ldd3_example/misc-modules/complete.ko

@@ -20,6 +20,11 @@ fi
 make > $trash
 gcc char_app.c -o char_app > $trash
 sudo insmod $module_name.ko > $trash
+# get major and minor from dmesg
+major=`dmesg | tail -1 | awk '{print $4}' | cut -c 1-3`
+minor=`dmesg | tail -1 | awk '{print $7}'`
+# create dev node for device
+sudo mknod /dev/chr_dev c $major $minor
 echo "Load $module_name."
 echo "Driver debug message:" > info
 dmesg | tail -5 >> info
@@ -27,7 +32,12 @@ dmesg | tail -5 >> info
 echo >> info
 echo "lsmod info:" >> info
 lsmod >> info
+./char_app
+echo >> info
+echo "char_app info:" >> info
+dmesg | tail -2 >> info
 sudo rmmod $module_name > $trash
+sudo rm /dev/chr_dev
 echo "Remove $module_name."
 # how to remote file node
 # rm /dev/chr_dev
