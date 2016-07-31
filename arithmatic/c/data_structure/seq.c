@@ -1,9 +1,7 @@
 /* Sequence list */
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include "error.h"
 #include "common.h"
 
 //思考，如果发生错误，应该在主函数中处理还是在function中就进行处理
@@ -40,7 +38,7 @@ int seq_set(seqlist *list, int set_loc, TYPE value)
 	}
 
 	//考虑set_loc为负数的情况，允许为负数的情况，不允许为负数的情况
-	if (abs(set_loc) >= list->size) {
+	if ((set_loc >= 0 && set_loc > list->size) || (set_loc < 0 && abs(set_loc) > 10)) {
 		error("set location is beyond the limitation\n");
 		return -1;
 	} else {
