@@ -524,7 +524,7 @@ int scullc_init(void)
 {
 	int result, i;
 	dev_t dev = MKDEV(scullc_major, 0);
-	
+
 	/*
 	 * Register your major, and accept a dynamic number.
 	 */
@@ -537,7 +537,6 @@ int scullc_init(void)
 	if (result < 0)
 		return result;
 
-	
 	/* 
 	 * allocate the devices -- we can't have them static, as the number
 	 * can be specified at load time
