@@ -262,6 +262,7 @@ BaseType_t xPortStartScheduler( void )
 
 		/* Determine the number of priority bits available.  First write to all
 		possible bits. */
+		//0xFF
 		*pucFirstUserPriorityRegister = portMAX_8_BIT_VALUE;
 
 		/* Read the value back to see how many bits stuck. */
@@ -291,7 +292,10 @@ BaseType_t xPortStartScheduler( void )
 	#endif /* conifgASSERT_DEFINED */
 
 	/* Make PendSV and SysTick the lowest priority interrupts. */
+	//每个中断的优先级通过8位来描述, 应该设置为最低优先级，对于cortex-m3来说就是255
+	//pendsv占用system handler priority register's 16-23 bits.
 	portNVIC_SYSPRI2_REG |= portNVIC_PENDSV_PRI;
+	//systick interrupt, 24-31bits
 	portNVIC_SYSPRI2_REG |= portNVIC_SYSTICK_PRI;
 
 	/* Start the timer that generates the tick ISR.  Interrupts are disabled
@@ -552,11 +556,7 @@ __weak void vPortSetupTimerInterrupt( void )
 		__asm volatile( "mrs %0, ipsr" : "=r"( ulCurrentInterrupt ) );
 
 		/* Is the interrupt number a user defined interrupt? */
-		if( ulCurrentInterrupt >= portFIRST_USER_INTERRUPT_NUMBER )
-		{
-			/* Look up the interrupt's priority. */
-			ucCurrentPriority = pcInterruptPriorityRegisters[ ulCurrentInterrupt ];
-
+		if( ulCurrentInterrupt >= portFIRST_USER_INTERRUPT_NUMBER ) { /* Look up the interrupt's priority. */ ucCurrentPriority = pcInterruptPriorityRegisters[ ulCurrentInterrupt ]; 
 			/* The following assertion will fail if a service routine (ISR) for
 			an interrupt that has been assigned a priority above
 			configMAX_SYSCALL_INTERRUPT_PRIORITY calls an ISR safe FreeRTOS API

@@ -272,6 +272,7 @@ extern "C" {
 	#error configMAX_TASK_NAME_LEN must be set to a minimum of 1 in FreeRTOSConfig.h
 #endif
 
+//configASSERT，调试中一般会定义
 #ifndef configASSERT
 	#define configASSERT( x )
 	#define configASSERT_DEFINED 0

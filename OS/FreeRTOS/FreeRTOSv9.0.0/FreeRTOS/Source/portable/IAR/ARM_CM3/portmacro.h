@@ -122,7 +122,9 @@ typedef unsigned long UBaseType_t;
 {															\
 	/* Set a PendSV to request a context switch. */			\
 	portNVIC_INT_CTRL_REG = portNVIC_PENDSVSET_BIT;			\
+	//实质是内嵌汇编的dsb指令（数据隔离，该指令之前的存储器访问全部执行完才能继续）
 	__DSB();												\
+	//实质是内嵌汇编的isb指令（指令隔离，该指令之前的指令执行完后才能向下执行）
 	__ISB();												\
 }
 
@@ -168,6 +170,8 @@ extern void vPortExitCritical( void );
 	__ISB();												\
 }
 
+/* 往BASEPRI寄存器写0，使能中断 */
+/* 往BASEPRI寄存器写其他值，则屏蔽所有优先级低于其的中断 */
 #define portENABLE_INTERRUPTS()					__set_BASEPRI( 0 )
 #define portENTER_CRITICAL()					vPortEnterCritical()
 #define portEXIT_CRITICAL()						vPortExitCritical()

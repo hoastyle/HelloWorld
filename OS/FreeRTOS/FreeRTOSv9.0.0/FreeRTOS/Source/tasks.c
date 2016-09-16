@@ -67,6 +67,7 @@
     1 tab == 4 spaces!
 */
 
+/* header file order: lib, freertos, other */
 /* Standard includes. */
 #include <stdlib.h>
 #include <string.h>
@@ -581,6 +582,8 @@ static void prvAddNewTaskToReadyList( TCB_t *pxNewTCB ) PRIVILEGED_FUNCTION;
 
 /*-----------------------------------------------------------*/
 
+/* static和non-static的区别？ */
+/* UBaseType_t: 无符号BaseType_t */
 #if( configSUPPORT_STATIC_ALLOCATION == 1 )
 
 	TaskHandle_t xTaskCreateStatic(	TaskFunction_t pxTaskCode,
@@ -1823,8 +1826,15 @@ static void prvAddNewTaskToReadyList( TCB_t *pxNewTCB )
 #endif /* ( ( INCLUDE_xTaskResumeFromISR == 1 ) && ( INCLUDE_vTaskSuspend == 1 ) ) */
 /*-----------------------------------------------------------*/
 
+/* 
+ * - 以最低优先级创建idle task
+ * - 关闭中断
+ * - 启动节拍定时器
+ * - 启动第一个任务
+ */
 void vTaskStartScheduler( void )
 {
+//defined in portmacro.h
 BaseType_t xReturn;
 
 	/* Add the idle task at the lowest priority. */
@@ -1856,6 +1866,7 @@ BaseType_t xReturn;
 	}
 	#else
 	{
+		//必须支持动态分配
 		/* The Idle task is being created using dynamically allocated RAM. */
 		xReturn = xTaskCreate(	prvIdleTask,
 								"IDLE", configMINIMAL_STACK_SIZE,
@@ -1885,6 +1896,8 @@ BaseType_t xReturn;
 		the created tasks contain a status word with interrupts switched on
 		so interrupts will automatically get re-enabled when the first task
 		starts to run. */
+		//what: defined in portmacro.h，disable interrupt < configMAX_SYSCALL_INTERRUPT_PRIORITY
+		//why: 关闭中断确保timer中断不会提前发生
 		portDISABLE_INTERRUPTS();
 
 		#if ( configUSE_NEWLIB_REENTRANT == 1 )
@@ -2758,6 +2771,7 @@ BaseType_t xSwitchRequired = pdFALSE;
 #endif /* configUSE_APPLICATION_TASK_TAG */
 /*-----------------------------------------------------------*/
 
+//在portasm.s中xPortPendSVHandler中被调用
 void vTaskSwitchContext( void )
 {
 	if( uxSchedulerSuspended != ( UBaseType_t ) pdFALSE )

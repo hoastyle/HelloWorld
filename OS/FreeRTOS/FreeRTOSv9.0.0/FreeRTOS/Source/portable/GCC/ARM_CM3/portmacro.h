@@ -86,6 +86,7 @@ extern "C" {
  */
 
 /* Type definitions. */
+//hao: 基本类型定义
 #define portCHAR		char
 #define portFLOAT		float
 #define portDOUBLE		double
@@ -112,8 +113,10 @@ typedef unsigned long UBaseType_t;
 /*-----------------------------------------------------------*/
 
 /* Architecture specifics. */
+//hao: 架构相关定义：生长方向，每ms tick数，对其要求
 #define portSTACK_GROWTH			( -1 )
 #define portTICK_PERIOD_MS			( ( TickType_t ) 1000 / configTICK_RATE_HZ )
+//hao: 作用是什么？
 #define portBYTE_ALIGNMENT			8
 /*-----------------------------------------------------------*/
 
@@ -121,6 +124,8 @@ typedef unsigned long UBaseType_t;
 #define portYIELD() 															\
 {																				\
 	/* Set a PendSV to request a context switch. */								\
+	//request a pendsv interrupt
+	//interrupt control state register
 	portNVIC_INT_CTRL_REG = portNVIC_PENDSVSET_BIT;								\
 																				\
 	/* Barriers are normally not required but do ensure the code is completely	\
@@ -142,6 +147,7 @@ extern void vPortExitCritical( void );
 #define portCLEAR_INTERRUPT_MASK_FROM_ISR(x)	vPortSetBASEPRI(x)
 #define portDISABLE_INTERRUPTS()				vPortRaiseBASEPRI()
 #define portENABLE_INTERRUPTS()					vPortSetBASEPRI(0)
+//hao: defined in port.c
 #define portENTER_CRITICAL()					vPortEnterCritical()
 #define portEXIT_CRITICAL()						vPortExitCritical()
 

@@ -347,6 +347,7 @@ BaseType_t xPortStartScheduler( void )
 	uxCriticalNesting = 0;
 
 	/* Start the first task. */
+	//文件作用范围, prv前缀
 	prvPortStartFirstTask();
 
 	/* Should never get here as the tasks will now be executing!  Call the task
