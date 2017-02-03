@@ -1,0 +1,11 @@
+#!/usr/bin/env python
+#coding=utf-8
+
+from sys import getrefcount
+
+a = [1, 2, 3]
+b = a
+print(getrefcount(b))
+
+del a
+print(getrefcount(b))
