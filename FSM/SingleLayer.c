@@ -1,4 +1,11 @@
-#include <stdio.h>
+/* Single Layer FSM 
+ * Be implemented based on table.
+ * Major elements:
+ * - switch table
+ * - curState
+ * - state machine handler to receive events
+ */
+#include "Layer.h"
 
 enum
 {
@@ -13,20 +20,6 @@ enum
 	EVENT2,
 	EVENT3,
 };
-
-typedef void (*ActFun)(void *);
-
-typedef struct ACT_TABLE_s
-{
-	int event;
-	ActFun eventActFun;
-} ACT_TABLE_t;
-
-typedef struct STATE_TABLE_s
-{
-	int state;
-	ACT_TABLE_t *StateTable;
-} STATE_TABLE_t;
 
 typedef struct FSM_s
 {
@@ -82,15 +75,15 @@ ACT_TABLE_t state2ActTable[] = {
 /*状态表*/
 // state table 嵌套 event table，每个state对应多个event
 STATE_TABLE_t FsmTable[] = {
-    {STATE1,state1ActTable},
-    {STATE2,state2ActTable},
+    {STATE1, state1ActTable},
+    {STATE2, state2ActTable},
 };
 
 ACT_TABLE_t *FSM_getActTable(FSM_t *pFsm)
 {
 	int i;
 	int curState = pFsm->curState;
-	int max_state_num = sizeof(FsmTable) / sizeof(STATE_TABLE_t);
+	int max_state_num = FSM_getNumStateTable(pFsm->FsmTable);
 	ACT_TABLE_t *ActTable;
 	 
 	for (i = 0; i < max_state_num; i++) {
@@ -112,7 +105,8 @@ void FSM_EventHandle(FSM_t* pFsm,int event)
     /*获取当前状态动作表*/
     pActTable = FSM_getActTable(pFsm);
 	if (pActTable == NULL) printf("error\n");
-	max_act_num = sizeof(*pActTable) / sizeof(ACT_TABLE_t);
+	//max_act_num = sizeof(*pActTable) / sizeof(ACT_TABLE_t);
+	max_act_num = FSM_getNumActTable(pActTable);
 	
     /*获取当前动作函数*/
     for(i=0; i < max_act_num; i++)
