@@ -66,33 +66,33 @@ void FSM_MoveState(FSM_t* pFsm, int state)
    return;
 }
 
-/*客户端提供的状态处理函数*/               
+/*客户端提供的状态处理函数*/
 void L1state1_Event1Fun(void* pFsm)
-{                                          
-    FSM_MoveState((FSM_t*)pFsm, L1_STATE2);   
-    printf("L1 event1 : L1 state1 - state2\n");
-    return;                                
+{
+	FSM_MoveState((FSM_t*)pFsm, L1_STATE2);
+	printf("L1 event1 : L1 state1 - state2\n");
+	return;
 }                                          
+
+void L1state1_Event3Fun(void* pFsm)
+{
+	FSM_MoveState((FSM_t*)pFsm, L1_STATE3);
+	printf("L1 event3 : L1 state1 - state3\n");
+	return;
+}
                                            
-void L1state1_Event3Fun(void* pFsm)           
-{                                          
-    FSM_MoveState((FSM_t*)pFsm, L1_STATE3);   
-    printf("L1 event3 : L1 state1 - state3\n");
-    return;                                
-}                                          
-                                           
-void L1state2_Event2Fun(void* pFsm)           
-{                                          
-    FSM_MoveState((FSM_t*)pFsm, L1_STATE3);   
-    printf("L1 event2 : L1 state2 - state3\n");
-    return;                                
+void L1state2_Event2Fun(void* pFsm)
+{
+	FSM_MoveState((FSM_t*)pFsm, L1_STATE3);
+	printf("L1 event2 : L1 state2 - state3\n");
+	return;
 }
 
 void L2state1_L2Event1Fun(void *pFsm)
 {
-    FSM_MoveState((FSM_t*)pFsm, L2_STATE2);   
+    FSM_MoveState((FSM_t*)pFsm, L2_STATE2);
     printf("L2 event1 : L2 state1 - state1\n");
-    return;                                
+    return;
 }
 
 void L1state2_L1L2Event1Fun(void* pFsm)

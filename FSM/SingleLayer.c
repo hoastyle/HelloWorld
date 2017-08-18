@@ -1,4 +1,4 @@
-/* Single Layer FSM 
+/* Single Layer FSM
  * Be implemented based on table.
  * Major elements:
  * - switch table
