@@ -22,4 +22,3 @@ int FSM_getNumStateTable(STATE_TABLE_t *FsmTable)
 {
 	return sizeof(*FsmTable) / sizeof(STATE_TABLE_t);
 }
-

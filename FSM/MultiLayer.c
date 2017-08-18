@@ -42,9 +42,10 @@ typedef struct FSM_STACK_s {
 typedef struct FSM_s
 {
 	int curState;
+	// initialize in FSM_Begin()
 	int curFsmNumStateTable;
 	STATE_TABLE_t *curFsmTable;
-	/* Store multiple state table */
+	/* Store multiple state table, initialized by FSM_Rgist() */
 	FSM_REGIST_t registFsm[MAX_FSM_NUM];
 	int registFsmNum;
 	FSM_STACK_t stack[MAX_FSM_STACK];
@@ -58,6 +59,22 @@ void FSM_MoveState(FSM_t* pFsm,int state);
 void FSM_EventHandle(FSM_t* pFsm,int event);
 void FSM_Push(FSM_t* pFsm);
 void FSM_Pop(FSM_t* pFsm);
+
+ACT_TABLE_t *FSM_getActTable(FSM_t *pFsm)                    
+{                                                            
+    int i;                                                   
+    int curState = pFsm->curState;                           
+    int max_state_num = pFsm->curFsmNumStateTable;
+    ACT_TABLE_t *ActTable;                                   
+                                                             
+    for (i = 0; i < max_state_num; i++) {                    
+        if (pFsm->curFsmTable[i].state == curState)             
+            break;
+    }
+
+    ActTable = pFsm->curFsmTable[i].StateTable;                 
+    return ActTable;                                         
+}
 
 /*状态迁移*/
 void FSM_MoveState(FSM_t* pFsm, int state)
@@ -108,7 +125,8 @@ void L1state2_L1L2Event1Fun(void* pFsm)
 void L2state2_L1L2Event2Fun(void* pFsm)
 {
     FSM_Pop((FSM_t*)pFsm);
-    printf("L1L2 event2 : L2 state2 - L2 state2\n");
+    FSM_MoveState((FSM_t*)pFsm, L1_STATE3);
+    printf("L1L2 event2 : L2 state2 - L1 state3\n");
 
     return;
 }
@@ -143,6 +161,11 @@ STATE_TABLE_t L2FsmTable[] = {
     {L2_STATE2, L2state2ActTable},
 };
 
+void FSM_Init(FSM_t* pFsm)
+{
+	pFsm->curStackTop = 0;
+}
+
 void FSM_Regist(FSM_t* pFsm, STATE_TABLE_t* pStateTable, int FsmId, int curFsmTableSize)
 {
     pFsm->registFsm[pFsm->registFsmNum].FsmId = FsmId;
@@ -167,6 +190,36 @@ void FSM_Begin(FSM_t* pFsm,int FsmId)
 	}
 
 	return;
+}
+
+void FSM_EventHandle(FSM_t* pFsm, int event)
+{
+    int max_act_num;                                         
+    int i;                                                   
+    ACT_TABLE_t* pActTable = NULL;                           
+    ActFun eventActFun = NULL;                               
+    /*获取当前状态动作表*/                                   
+    pActTable = FSM_getActTable(pFsm);                       
+    if (pActTable == NULL) printf("error\n");                
+    //max_act_num = sizeof(*pActTable) / sizeof(ACT_TABLE_t);
+    max_act_num = FSM_getNumActTable(pActTable);             
+                                                             
+    /*获取当前动作函数*/                                     
+    for(i=0; i < max_act_num; i++)                           
+    {                                                        
+        if(event == pActTable[i].event)                      
+        {                                                    
+            eventActFun = pActTable[i].eventActFun;          
+            if (eventActFun == NULL)                         
+                printf("event pointer is null, error\n");    
+            break;                                           
+        }                                                    
+    }                                                        
+    /*动作执行*/                                             
+    if(eventActFun)                                          
+    {                                                        
+        eventActFun(pFsm);                                   
+    }                                                        
 }
 
 void FSM_Push(FSM_t* pFsm)
@@ -200,9 +253,11 @@ int main(int argc, char *argv[])
     FSM_t pFsm;
 
     FSM_Init(&pFsm);
+
     /*状态机注册*/
     FSM_Regist(&pFsm, L1FsmTable, FSM_L1, sizeof(L1FsmTable)/sizeof(STATE_TABLE_t));
     FSM_Regist(&pFsm, L2FsmTable, FSM_L2, sizeof(L2FsmTable)/sizeof(STATE_TABLE_t));
+
     /*开始L1状态机*/
     FSM_Begin(&pFsm, FSM_L1);
     FSM_MoveState(&pFsm, L1_STATE1);
