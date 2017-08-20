@@ -1,29 +1,10 @@
 /* Multi Layer FSM */
 
+#include "MultiLayer.h"
 #include "Layer.h"
 
 #define MAX_FSM_NUM 2
 #define MAX_FSM_STACK 2
-
-enum {
-	L1_STATE1,
-	L1_STATE2,
-	L1_STATE3,
-	L2_STATE1,
-	L2_STATE2,
-};
-
-enum {
-	L1_EVENT1,
-	L1_EVENT2,
-	L1_EVENT3,
-	L2_EVENT1,
-	L1_L2_EVENT1,
-	L1_L2_EVENT2,
-};
-
-char *s_state[5] = {"L1_STATE1", "L1_STATE2", "L1_STATE3", "L2_STATE1", "L2_STATE2"};
-char *s_event[6] = {"L1_EVENT1", "L1_EVENT2", "L1_EVENT3", "L2_EVENT1", "L1_L2_EVENT1", "L1_L2_EVENT2"};
 
 enum {
 	FSM_L1 = 1,
@@ -37,7 +18,7 @@ typedef struct FSM_REGIST_s {
 } FSM_REGIST_t;
 
 typedef struct FSM_STACK_s {
-	int state;
+	STATE_t state;
 	STATE_TABLE_t *pFsmTable;
 	int NumStateTable;
 } FSM_STACK_t;
@@ -58,15 +39,15 @@ void FSM_Init(FSM_t * pFsm);
 void FSM_Regist(FSM_t * pFsm, STATE_TABLE_t * pStateTable, int FsmId,
 		int curFsmTableSize);
 void FSM_Begin(FSM_t * pFsm, int FsmId);
-void FSM_MoveState(FSM_t * pFsm, int state);
-void FSM_EventHandle(FSM_t * pFsm, int event);
+void FSM_MoveState(FSM_t * pFsm, STATE_t state);
+void FSM_EventHandle(FSM_t * pFsm, EVENT_t event);
 void FSM_Push(FSM_t * pFsm);
 void FSM_Pop(FSM_t * pFsm);
 
 ACT_TABLE_t *FSM_getActTable(FSM_t * pFsm)
 {
 	int i;
-	int curState = pFsm->curState;
+	STATE_t curState = pFsm->curState;
 	int max_state_num = pFsm->curFsmNumStateTable;
 	ACT_TABLE_t *ActTable;
 
@@ -199,7 +180,7 @@ void FSM_Begin(FSM_t * pFsm, int FsmId)
 }
 
 /* 状态迁移 */
-void FSM_MoveState(FSM_t * pFsm, int state)
+void FSM_MoveState(FSM_t * pFsm, STATE_t state)
 {
 	printf("From %s to %s\n", s_state[pFsm->curState], s_state[state]);
 	pFsm->curState = state;
@@ -232,7 +213,7 @@ void FSM_Pop(FSM_t * pFsm)
 	return;
 }
 
-void FSM_EventHandle(FSM_t * pFsm, int event)
+void FSM_EventHandle(FSM_t * pFsm, EVENT_t event)
 {
 	int max_act_num = 0;
 	int i = 0;

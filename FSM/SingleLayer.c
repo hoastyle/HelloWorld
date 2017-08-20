@@ -5,25 +5,13 @@
  * - curState
  * - state machine handler to receive events
  */
+
+#include "SingleLayer.h"
 #include "Layer.h"
-
-enum {
-	STATE1,
-	STATE2,
-	STATE3,
-};
-
-enum {
-	EVENT1,
-	EVENT2,
-	EVENT3,
-};
-
-char *s_state[3] = {"STATE1", "STATE2", "STATE3"};
 
 typedef struct FSM_s {
 	STATE_TABLE_t *FsmTable;
-	int curState;
+	STATE_t curState;
 } FSM_t;
 
 void FSM_Regist(FSM_t * pFsm, STATE_TABLE_t * pStateTable)
@@ -33,7 +21,7 @@ void FSM_Regist(FSM_t * pFsm, STATE_TABLE_t * pStateTable)
 }
 
 /*状态迁移*/
-void FSM_MoveState(FSM_t * pFsm, int state)
+void FSM_MoveState(FSM_t * pFsm, STATE_t state)
 {
 	printf("From %s to %s\n", s_state[pFsm->curState], s_state[state]);
 	pFsm->curState = state;
@@ -85,7 +73,7 @@ STATE_TABLE_t FsmTable[] = {
 ACT_TABLE_t *FSM_getActTable(FSM_t * pFsm)
 {
 	int i;
-	int curState = pFsm->curState;
+	STATE_t curState = pFsm->curState;
 	int max_state_num = FSM_getNumStateTable(pFsm->FsmTable);
 	ACT_TABLE_t *ActTable;
 
@@ -99,7 +87,7 @@ ACT_TABLE_t *FSM_getActTable(FSM_t * pFsm)
 }
 
 /*事件处理*/
-void FSM_EventHandle(FSM_t * pFsm, int event)
+void FSM_EventHandle(FSM_t * pFsm, EVENT_t event)
 {
 	int max_act_num;
 	int i;
