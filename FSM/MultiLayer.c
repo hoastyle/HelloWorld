@@ -23,6 +23,7 @@ enum {
 };
 
 char *s_state[5] = {"L1_STATE1", "L1_STATE2", "L1_STATE3", "L2_STATE1", "L2_STATE2"};
+char *s_event[6] = {"L1_EVENT1", "L1_EVENT2", "L1_EVENT3", "L2_EVENT1", "L1_L2_EVENT1", "L1_L2_EVENT2"};
 
 enum {
 	FSM_L1 = 1,
@@ -238,6 +239,7 @@ void FSM_EventHandle(FSM_t * pFsm, int event)
 	ACT_TABLE_t *pActTable = NULL;
 	ActFun eventActFun = NULL;
 
+	printf("Event %s\n", s_event[event]);
 	/* 获取当前状态动作表 */
 	pActTable = FSM_getActTable(pFsm);
 	if (pActTable == NULL) {
@@ -292,7 +294,7 @@ int main(int argc, char *argv[])
 		/* L1状态机处理 */
 		FSM_EventHandle(&pFsm, L1_EVENT2);
 		sleep(1);
-		printf("One more round\n");
+		printf("-------- One more round --------\n");
 	}
 	return 0;
 }
