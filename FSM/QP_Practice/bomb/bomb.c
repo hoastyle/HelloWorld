@@ -1,3 +1,7 @@
+/* Bomb implementation by FSM in switch-case way */
+/* More things to do 
+ * - Add multi task to handle all these?
+ */
 #include <stdio.h>
 #include <stdlib.h>
 
