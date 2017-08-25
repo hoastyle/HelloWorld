@@ -6,31 +6,32 @@
 #include <unistd.h>  
 #include <fcntl.h> 
 
-// ? 未定义
 #define INIT_TIMEOUT 10
 
 #define TRAN(bomb, target) (bomb->curState = target)
 
 int kbhit(void)  
 {  
-  struct termios oldt, newt;  
-  int ch;  
-  int oldf;  
-  tcgetattr(STDIN_FILENO, &oldt);  
-  newt = oldt;  
-  newt.c_lflag &= ~(ICANON | ECHO);  
-  tcsetattr(STDIN_FILENO, TCSANOW, &newt);  
-  oldf = fcntl(STDIN_FILENO, F_GETFL, 0);  
-  fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);  
-  ch = getchar();  
-  tcsetattr(STDIN_FILENO, TCSANOW, &oldt);  
-  fcntl(STDIN_FILENO, F_SETFL, oldf);  
-  if(ch != EOF)  
-  {  
-    ungetc(ch, stdin);  
-    return 1;  
-  }  
-  return 0;  
+	struct termios oldt, newt;  
+	int ch;  
+	int oldf;  
+
+	tcgetattr(STDIN_FILENO, &oldt);  
+	newt = oldt;  
+	newt.c_lflag &= ~(ICANON | ECHO);  
+	tcsetattr(STDIN_FILENO, TCSANOW, &newt);  
+	oldf = fcntl(STDIN_FILENO, F_GETFL, 0);  
+	fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);  
+	ch = getchar();  
+	tcsetattr(STDIN_FILENO, TCSANOW, &oldt);  
+	fcntl(STDIN_FILENO, F_SETFL, oldf);  
+
+	if(ch != EOF)  
+	{  
+	  ungetc(ch, stdin);  
+	  return 1;  
+	}  
+	return 0;  
 } 
 
 /* Signal */
@@ -91,7 +92,7 @@ void bomb_dispatch(bomb_t *bomb, event_t *e)
 	switch (bomb->curState) {
 		case SETTING_STATE: {
 			switch (e->sig) {
-				// 不引起状态变化
+				/* 不引起状态变化 */
 				case UP_SIG:
 					if (bomb->timeout < 60) {
 						++bomb->timeout;
@@ -104,7 +105,7 @@ void bomb_dispatch(bomb_t *bomb, event_t *e)
 						printf("timeout is %d\n", bomb->timeout);
 					}
 					break;
-				// 引起状态变化
+				/* 引起状态变化 */
 				case ARM_SIG: 
 					bomb->code = 0;
 					TRAN(bomb, TIMING_STATE);
@@ -125,7 +126,6 @@ void bomb_dispatch(bomb_t *bomb, event_t *e)
 					bomb->code <<= 1;
 					break;
 				}
-				// 引起状态变化
 				case ARM_SIG: {
 					if (bomb->code == bomb->defcode) {
 						TRAN(bomb, SETTING_STATE);
@@ -157,6 +157,10 @@ void main()
 	bomb_t bomb;
 	event_t *e = (event_t *)0;
 
+	static event_t up_evt   = { UP_SIG   };
+	static event_t down_evt = { DOWN_SIG };
+	static event_t arm_evt  = { ARM_SIG  };
+
 	bomb_create(&bomb, 8);
 	bomb_init(&bomb);
 
@@ -173,18 +177,15 @@ void main()
 		// 100ms
 		usleep(100000);
 
+		/* Reduce coupling */
 		if (++tick_evt.fine_time == 10)
 			tick_evt.fine_time = 0;
 
 		bomb_dispatch(&bomb, (event_t *)&tick_evt);
 
-		// contruct event
-		// 只有输入的时候才停下
+		/* contruct event */
+		/* 只有输入的时候才停下 */
 		if (kbhit()) {
-			static event_t up_evt   = { UP_SIG   };
-			static event_t down_evt = { DOWN_SIG };
-			static event_t arm_evt  = { ARM_SIG  };
-
 			switch (getchar()) {
 				case 'u': {
 					printf("\nUP: ");
