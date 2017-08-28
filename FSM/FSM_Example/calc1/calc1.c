@@ -99,6 +99,8 @@ static QState Calc_on(Calc * const me, QEvt const * const e) {
         /* ${SMs::Calc::SM::on::C} */
         case C_SIG: {
             BSP_clear();
+			// 外部转换，需要执行entry and exit
+			// temp.fun = target, return transition
             status_ = Q_TRAN(&Calc_on);
             break;
         }
@@ -108,6 +110,7 @@ static QState Calc_on(Calc * const me, QEvt const * const e) {
             break;
         }
         default: {
+			// 嵌套在top state中, state层级关系通过state handler中的Q_SUPER来确定
             status_ = Q_SUPER(&QHsm_top);
             break;
         }

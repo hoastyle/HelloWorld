@@ -160,6 +160,7 @@ void QHsm_init_(QHsm * const me, QEvt const * const e) {
                       && (t == Q_STATE_CAST(&QHsm_top)));
 
 	// return ignored
+	// initial function, will set temp.fun = on state, return tran
     r = (*me->temp.fun)(me, e); /* execute the top-most initial transition */
 
     /* the top-most initial transition must be taken */
@@ -176,9 +177,11 @@ void QHsm_init_(QHsm * const me, QEvt const * const e) {
         QStateHandler path[QHSM_MAX_NEST_DEPTH_]; /* tran entry path array */
         int_fast8_t ip = (int_fast8_t)0;          /* tran entry path index */
 
+		// target state function which was transitioned by initial
         path[0] = me->temp.fun;
+		// 向上一级
         (void)QEP_TRIG_(me->temp.fun, QEP_EMPTY_SIG_);
-		// 只要不等于top
+		// 轮询知道top
         while (me->temp.fun != t) {
             ++ip;
             Q_ASSERT_ID(220, ip < (int_fast8_t)Q_DIM(path));
@@ -186,6 +189,7 @@ void QHsm_init_(QHsm * const me, QEvt const * const e) {
             path[ip] = me->temp.fun;
             (void)QEP_TRIG_(me->temp.fun, QEP_EMPTY_SIG_);
         }
+		// target state function
         me->temp.fun = path[0];
 
         /* retrace the entry path in reverse (desired) order... */
@@ -198,7 +202,7 @@ void QHsm_init_(QHsm * const me, QEvt const * const e) {
 		// t为target state
         t = path[0]; /* current state becomes the new source */
 
-		// 执行target state的initial function
+		// 执行target state的initial function，如果当前的target state需要继续转换，则继续循环
         r = QEP_TRIG_(t, Q_INIT_SIG); /* execute initial transition */
 
 #ifdef Q_SPY
@@ -219,6 +223,7 @@ void QHsm_init_(QHsm * const me, QEvt const * const e) {
         QS_FUN_(t);    /* the new active state */
     QS_END_()
 
+	// 将state和temp都置为当前
     me->state.fun = t; /* change the current active state */
     me->temp.fun  = t; /* mark the configuration as stable */
 }
